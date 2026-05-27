@@ -84211,15 +84211,15 @@ var init_proxy = __esm({
     };
     VIDEO_PRICING = {
       "xai/grok-imagine-video": { pricePerSecond: 0.05, defaultDurationSeconds: 8 },
-      "bytedance/seedance-1.5-pro": { pricePerSecond: 0.04375, defaultDurationSeconds: 5 },
+      "bytedance/seedance-1.5-pro": { pricePerSecond: 0.0875, defaultDurationSeconds: 5 },
       "bytedance/seedance-2.0-fast": {
-        pricePerSecond: 0.11343,
-        pricePerSecondImageInput: 0.06684,
+        pricePerSecond: 0.22687,
+        pricePerSecondImageInput: 0.13369,
         defaultDurationSeconds: 5
       },
       "bytedance/seedance-2.0": {
-        pricePerSecond: 0.14179,
-        pricePerSecondImageInput: 0.0871,
+        pricePerSecond: 0.28358,
+        pricePerSecondImageInput: 0.1742,
         defaultDurationSeconds: 5
       }
     };
@@ -84778,8 +84778,8 @@ var init_registry = __esm({
         name: "Video Generation",
         partner: "BlockRun",
         category: "Image & Video",
-        shortDescription: "Grok Imagine + Seedance, 5\u201310s",
-        description: "Generate a short video (5\u201310s) via xai/grok-imagine-video or bytedance/seedance-1.5-pro (default, cheapest) / seedance-2.0-fast / seedance-2.0. Async \u2014 upstream polling takes 30\u2013120 seconds. Returns a local http://localhost:8402/videos/<file>.mp4 URL.",
+        shortDescription: "Grok Imagine + Seedance, 5\u201310s (720p + audio on t2v)",
+        description: "Generate a short video (5\u201310s) via xai/grok-imagine-video or bytedance/seedance-1.5-pro (default, cheapest) / seedance-2.0-fast / seedance-2.0. Seedance defaults to 720p with synced audio for text-to-video. Seedance 2.0 variants accept optional `real_face_asset_id` (`ta_xxxxxxxx`) for BytePlus RealFace character consistency \u2014 mutually exclusive with `image_url`. Async \u2014 upstream polling takes 30\u2013120 seconds. Returns a local http://localhost:8402/videos/<file>.mp4 URL.",
         proxyPath: "/videos/generations",
         method: "POST",
         params: [
@@ -84800,17 +84800,29 @@ var init_registry = __esm({
             type: "number",
             description: "Clip length in seconds. Supported: 5, 8, 10. Default depends on model.",
             required: false
+          },
+          {
+            name: "image_url",
+            type: "string",
+            description: "Optional first-frame image URL for image-to-video. Cheaper per-token on 2.0 variants. Cannot be combined with `real_face_asset_id`.",
+            required: false
+          },
+          {
+            name: "real_face_asset_id",
+            type: "string",
+            description: "Optional BytePlus RealFace asset id (format `ta_xxxxxxxx`) for real-person character consistency across frames. Seedance 2.0 Fast / 2.0 Pro only \u2014 rejected on 1.5 Pro. Asset ids come from token360's H5 verification flow.",
+            required: false
           }
         ],
         pricing: {
-          perUnit: "$0.03\u2013$0.30",
+          perUnit: "$0.05\u2013$0.30",
           unit: "second",
-          minimum: "$0.15 (seedance-1.5-pro 5s)",
-          maximum: "$3.00 (seedance-2.0 10s)"
+          minimum: "$0.42 (grok-imagine-video 8s) / $0.46 (seedance-1.5-pro 5s)",
+          maximum: "$2.98 (seedance-2.0 10s text-to-video)"
         },
         example: {
           input: { model: "bytedance/seedance-1.5-pro", prompt: "a cat waving", duration_seconds: 5 },
-          description: "Generate a 5-second Seedance video"
+          description: "Generate a 5-second Seedance video (720p + audio defaults)"
         }
       },
       // ---------------------------------------------------------------------------
@@ -87343,9 +87355,7 @@ var init_index = __esm({
               }
               lines.push("");
             }
-            lines.push(
-              "Tool-call any of these in chat, or use `/cr-imagegen` / `/videogen` directly."
-            );
+            lines.push("Tool-call any of these in chat, or use `/cr-imagegen` / `/videogen` directly.");
             return { text: lines.join("\n") };
           }
         });
@@ -87490,7 +87500,9 @@ ${errText}`
               }
               const result = await resp.json();
               if (!result.call_id) {
-                return { text: `Voice call accepted but no call_id returned: ${JSON.stringify(result)}` };
+                return {
+                  text: `Voice call accepted but no call_id returned: ${JSON.stringify(result)}`
+                };
               }
               const lines = [
                 `\u{1F4DE} Calling **${parsed.to}** (call_id: \`${result.call_id}\`)`,
@@ -88432,8 +88444,10 @@ async function cmdPhone(port, subcommand, numbersAction, arg, areaCode) {
     const text = await resp.text();
     if (!resp.ok) {
       if (resp.status === 402) {
-        throw new Error(`Insufficient wallet balance (HTTP 402). Fund wallet via clawrouter wallet.
-${text}`);
+        throw new Error(
+          `Insufficient wallet balance (HTTP 402). Fund wallet via clawrouter wallet.
+${text}`
+        );
       }
       throw new Error(`HTTP ${resp.status}: ${text}`);
     }
@@ -88468,7 +88482,9 @@ Active numbers (${numbers.length}):
         const numWidth = Math.max(...numbers.map((n) => n.phone_number.length), 16);
         for (const n of numbers) {
           const country = (n.country ?? "??").padEnd(3);
-          console.log(`  ${n.phone_number.padEnd(numWidth)}  ${country}  expires ${fmtExpiry(n.expires_at)}`);
+          console.log(
+            `  ${n.phone_number.padEnd(numWidth)}  ${country}  expires ${fmtExpiry(n.expires_at)}`
+          );
         }
         console.log();
       } else if (numbersAction === "buy") {
@@ -88480,9 +88496,11 @@ Active numbers (${numbers.length}):
         }
         const body = { country };
         if (areaCode) body.areaCode = areaCode;
-        console.log(`
+        console.log(
+          `
 Buying ${country} number${areaCode ? ` (area code ${areaCode})` : ""}... ($5.00 / 30-day lease)
-`);
+`
+        );
         const result = await postJson("/v1/phone/numbers/buy", body);
         if (result.phone_number) {
           console.log(`  \u2713 ${result.phone_number}`);

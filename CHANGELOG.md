@@ -4,6 +4,20 @@ All notable changes to ClawRouter.
 
 ---
 
+## v0.12.197 — May 27, 2026
+
+- **Plugin now loads at gateway boot (manifest capability declarations).** OpenClaw 2026.5.x's strict gateway-boot plugin loader requires the manifest to declare the capabilities a plugin provides. `openclaw.plugin.json` declared none (`Shape: non-capability`), so after `openclaw gateway restart` the loader silently **skipped** ClawRouter: the x402 proxy never bound `:8402`, the BlockRun provider/web-search/partner tools never registered, and `/wallet`, `/blockrun`, `/stats` etc. returned "no such command" inside the TUI. Install-time hot-reload is lenient and still loaded the plugin, which masked the regression — `openclaw plugins doctor` was the tell, repeating `clawrouter: plugin must declare contracts.tools before registering agent tools` 26×. Fix adds the four declarations the strict loader needs:
+  - `contracts.tools` — the 26 partner tools registered at runtime (`blockrun_predexon_*`, `blockrun_stock_*`, `blockrun_crypto_*`/`fx_*`/`commodity_*`, `blockrun_image_*`, `blockrun_video_generation`, `blockrun_phone_*`, `blockrun_voice_*`). Verified to be an **exact match** to `src/partners/registry.ts` runtime registration — no missing, no extra.
+  - `contracts.webSearchProviders: ["blockrun-exa"]` — the Exa-backed web search provider (`src/web-search-provider.ts`).
+  - `providers: ["blockrun"]` — declares ownership of the `blockrun/*` model IDs (`src/provider.ts`), same pattern as `anthropic`/`openai`.
+  - `activation.onStartup: true` + `enabledByDefault: true` — opt into the trusted boot-load path so the proxy comes up at gateway start instead of lazy-loading.
+
+  Manifest-only change (static JSON read directly by the loader, not bundled into `dist/`); it does not touch the runtime config-write path, so it cannot trip OpenClaw's `baseHash` `ConfigMutationConflictError`. Closes the gateway-restart load failure on OpenClaw 2026.5.19+. Contributor credit: PR [#171](https://github.com/BlockRunAI/ClawRouter/pull/171) by [@bogdan-velicu](https://github.com/bogdan-velicu) — first-time contributor, thorough repro + verification writeup. 🎉
+
+- **Ships v0.12.195's Seedance pricing fix (latent stale-`dist/`).** v0.12.195 updated `src/proxy.ts` to the 720p+audio per-second rates (e.g. `seedance-1.5-pro` `$0.04375/sec` → `$0.0875/sec`), but the committed `dist/` bundle at v0.12.195 **and** v0.12.196 was never rebuilt from that source — both releases shipped the old 480p-baseline pricing, so the local `estimateVideoCost` telemetry kept under-reporting Seedance usage by ~2× (payment is server-dictated, so no overcharge — telemetry only). This release rebuilds `dist/` from current source, so the corrected Seedance per-second rates finally land in the published bundle.
+
+---
+
 ## v0.12.196 — May 24, 2026
 
 - **Updater recovers from OpenClaw size-drop rejection.** OpenClaw v2026.4.5+ refuses to write a config that would shrink the file by a large amount (data-loss guard). Users on a pre-v0.12.175 install carry ~175 entries in `models.providers.blockrun.models`; upgrading to a current ClawRouter legitimately trims that to ~38 (≈90 KB → 25 KB), tripping OpenClaw's guard. The updater previously surfaced this as a hard failure and rolled back, stranding users on the old version. Fix in `scripts/update.sh`: pipe the install output to a captured log, detect the `Config write rejected: …size-drop:` signature, validate the rejected payload against a conservative checklist (top-level keys unchanged, required sections present, model count actually shrank, curated count in [20, 100], non-model sections drift ≤ 2 KB, residual models section ≤ 4 KB, ≥ 65% of the drop comes from the model list), apply just the scoped model-list trim atomically (`tmp.PID` → rename), then fall through to a direct `npm pack` install of the latest version. The EXIT/INT/TERM rollback trap stays active across the fallback path so Ctrl+C still restores the previous install. Tested on a real VPS reproducing the 90728 → 25514 rejection.

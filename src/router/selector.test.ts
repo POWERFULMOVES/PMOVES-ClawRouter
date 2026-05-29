@@ -19,6 +19,7 @@ const TIER_CONFIGS: Record<"SIMPLE" | "MEDIUM" | "COMPLEX" | "REASONING", TierCo
 const MODEL_PRICING = new Map<string, ModelPricing>([
   ["moonshot/kimi-k2.5", { inputPrice: 0.5, outputPrice: 2.4 }],
   ["anthropic/claude-opus-4.7", { inputPrice: 5, outputPrice: 25 }],
+  ["anthropic/claude-opus-4.8", { inputPrice: 5, outputPrice: 25 }],
 ]);
 
 describe("selectModel", () => {

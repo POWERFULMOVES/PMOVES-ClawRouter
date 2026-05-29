@@ -4,6 +4,19 @@ All notable changes to ClawRouter.
 
 ---
 
+## v0.12.198 — May 29, 2026
+
+- **Claude Opus 4.8 is now the Anthropic flagship.** BlockRun's source-of-truth model registry (`blockrun/src/lib/models.ts`) shipped `anthropic/claude-opus-4.8` as its current featured flagship — $5/$25 per 1M (identical to 4.7), 1M context, 128K output, adaptive thinking, `fallbackModel: claude-opus-4.7`. This release aligns ClawRouter:
+  - **Model registry** (`src/models.ts`): added `anthropic/claude-opus-4.8` to `BLOCKRUN_MODELS` (mirrors the 4.7 spec — 1M ctx, 128K out, reasoning/vision/agentic/tools).
+  - **Aliases** (`src/models.ts`): bare `opus`, `opus-4`, `anthropic/opus`, and generic `anthropic/claude-opus-4` now resolve to 4.8, matching BlockRun (where bare opus / `clawrouter-premium` redirect to 4.8). New explicit pins `opus-4.8` / `opus-4-8` / `anthropic/claude-opus-4-8`. Explicit `opus-4.7` / `opus-4.6` / `opus-4.5` pins stay routable on their own version for cost-stability callers.
+  - **Router** (`src/router/config.ts`): `premiumTiers.COMPLEX` primary promoted `claude-opus-4.7` → `claude-opus-4.8` (cost-neutral — same $5/$25), with 4.7 inserted as the first in-family fallback. 4.8 also inserted ahead of 4.7 in the premium REASONING, agentic COMPLEX, and agentic REASONING fallback chains. `selector.ts` baseline left on 4.7 (pricing-identical; no savings-math change).
+  - **Picker** (`src/top-models.json`): added 4.8, removed 4.6 (already hidden on BlockRun). Picker now shows opus-4.8 + opus-4.7; 4.6 stays resolvable via explicit alias. Note: existing users carry stale `cfg.models.providers.blockrun.models` arrays (OpenClaw merges, never deletes), so the 4.6 removal only takes effect on a fresh prune/re-install — same caveat as v0.12.175.
+  - **Diagnostics** (`src/doctor.ts`): `doctor opus` deep-analysis model bumped to 4.8 (identical cost).
+  - **Docs**: README pricing tables/examples and `skills/clawrouter/SKILL.md` model list refreshed.
+  - No provider-routing or `thinking`-block changes: 4.8's adaptive-thinking contract is identical to 4.7's, which ClawRouter has routed in production without injecting explicit thinking blocks.
+
+---
+
 ## v0.12.197 — May 27, 2026
 
 - **Plugin now loads at gateway boot (manifest capability declarations).** OpenClaw 2026.5.x's strict gateway-boot plugin loader requires the manifest to declare the capabilities a plugin provides. `openclaw.plugin.json` declared none (`Shape: non-capability`), so after `openclaw gateway restart` the loader silently **skipped** ClawRouter: the x402 proxy never bound `:8402`, the BlockRun provider/web-search/partner tools never registered, and `/wallet`, `/blockrun`, `/stats` etc. returned "no such command" inside the TUI. Install-time hot-reload is lenient and still loaded the plugin, which masked the regression — `openclaw plugins doctor` was the tell, repeating `clawrouter: plugin must declare contracts.tools before registering agent tools` 26×. Fix adds the four declarations the strict loader needs:

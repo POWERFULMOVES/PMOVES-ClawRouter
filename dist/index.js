@@ -58349,8 +58349,8 @@ var top_models_default = [
   "eco",
   "premium",
   "anthropic/claude-sonnet-4.6",
+  "anthropic/claude-opus-4.8",
   "anthropic/claude-opus-4.7",
-  "anthropic/claude-opus-4.6",
   "anthropic/claude-haiku-4.5",
   "openai/gpt-5.5",
   "openai/gpt-5.4",
@@ -58396,15 +58396,17 @@ var TOP_MODELS = Object.freeze(loadTopModels());
 
 // src/models.ts
 var MODEL_ALIASES = {
-  // Claude - flagship opus is 4.7; sonnet stays at 4.6
+  // Claude - flagship opus is 4.8; sonnet stays at 4.6
   claude: "anthropic/claude-sonnet-4.6",
   "br-sonnet": "anthropic/claude-sonnet-4.6",
   sonnet: "anthropic/claude-sonnet-4.6",
   "sonnet-4": "anthropic/claude-sonnet-4.6",
   "sonnet-4.6": "anthropic/claude-sonnet-4.6",
   "sonnet-4-6": "anthropic/claude-sonnet-4.6",
-  opus: "anthropic/claude-opus-4.7",
-  "opus-4": "anthropic/claude-opus-4.7",
+  opus: "anthropic/claude-opus-4.8",
+  "opus-4": "anthropic/claude-opus-4.8",
+  "opus-4.8": "anthropic/claude-opus-4.8",
+  "opus-4-8": "anthropic/claude-opus-4.8",
   "opus-4.7": "anthropic/claude-opus-4.7",
   "opus-4-7": "anthropic/claude-opus-4.7",
   "opus-4.6": "anthropic/claude-opus-4.6",
@@ -58412,14 +58414,15 @@ var MODEL_ALIASES = {
   haiku: "anthropic/claude-haiku-4.5",
   // Claude - provider/shortname patterns (common in agent frameworks)
   "anthropic/sonnet": "anthropic/claude-sonnet-4.6",
-  "anthropic/opus": "anthropic/claude-opus-4.7",
+  "anthropic/opus": "anthropic/claude-opus-4.8",
   "anthropic/haiku": "anthropic/claude-haiku-4.5",
   "anthropic/claude": "anthropic/claude-sonnet-4.6",
-  // Backward compatibility - generic opus-4 and older flagships point at 4.7;
-  // explicit version pins (claude-opus-4-6) stay on 4.6 since server still routes it.
+  // Backward compatibility - generic opus-4 and older flagships point at 4.8;
+  // explicit version pins (claude-opus-4-7) stay on their version since server still routes them.
   "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4.6",
   "anthropic/claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
-  "anthropic/claude-opus-4": "anthropic/claude-opus-4.7",
+  "anthropic/claude-opus-4": "anthropic/claude-opus-4.8",
+  "anthropic/claude-opus-4-8": "anthropic/claude-opus-4.8",
   "anthropic/claude-opus-4-7": "anthropic/claude-opus-4.7",
   "anthropic/claude-opus-4-6": "anthropic/claude-opus-4.6",
   "anthropic/claude-opus-4-5": "anthropic/claude-opus-4.5",
@@ -58943,6 +58946,19 @@ var BLOCKRUN_MODELS = [
     id: "anthropic/claude-opus-4.7",
     name: "Claude Opus 4.7",
     version: "4.7",
+    inputPrice: 5,
+    outputPrice: 25,
+    contextWindow: 1e6,
+    maxOutput: 128e3,
+    reasoning: true,
+    vision: true,
+    agentic: true,
+    toolCalling: true
+  },
+  {
+    id: "anthropic/claude-opus-4.8",
+    name: "Claude Opus 4.8",
+    version: "4.8",
     inputPrice: 5,
     outputPrice: 25,
     contextWindow: 1e6,
@@ -75547,15 +75563,17 @@ var DEFAULT_ROUTING_CONFIG = {
       ]
     },
     COMPLEX: {
-      primary: "anthropic/claude-opus-4.7",
-      // Best quality for complex tasks
+      primary: "anthropic/claude-opus-4.8",
+      // Best quality for complex tasks — newest flagship, same $5/$25 as 4.7
       // Fallback chain de-Gemini'd 2026-04-22: when Anthropic 503s, Gemini is
       // also prone to "high demand" 503s (correlated failure — everyone falls
       // back to Google at the same time). Prefer xAI Grok → Moonshot → OpenAI
       // flagship → DeepSeek → NVIDIA free instead.
       fallback: [
+        "anthropic/claude-opus-4.7",
+        // in-family hot swap first (identical cost)
         "anthropic/claude-opus-4.6",
-        // in-family hot swap first
+        // in-family hot swap
         "anthropic/claude-sonnet-4.6",
         "xai/grok-4-0709",
         // 503-resistant flagship
@@ -75577,6 +75595,8 @@ var DEFAULT_ROUTING_CONFIG = {
       primary: "anthropic/claude-sonnet-4.6",
       // 2,110ms, $3/$15 - best for reasoning/instructions
       fallback: [
+        "anthropic/claude-opus-4.8",
+        // Newest flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.7",
         // Flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.6",
@@ -75627,6 +75647,8 @@ var DEFAULT_ROUTING_CONFIG = {
       // correlate with Anthropic outages (everyone falls back together).
       // Prefer 503-resistant providers first.
       fallback: [
+        "anthropic/claude-opus-4.8",
+        // Newest flagship Opus — in-family hot swap
         "anthropic/claude-opus-4.7",
         // Flagship Opus — in-family hot swap
         "anthropic/claude-opus-4.6",
@@ -75649,6 +75671,8 @@ var DEFAULT_ROUTING_CONFIG = {
       primary: "anthropic/claude-sonnet-4.6",
       // 2,110ms — strong tool use + reasoning
       fallback: [
+        "anthropic/claude-opus-4.8",
+        // Newest flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.7",
         // Flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.6",

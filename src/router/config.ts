@@ -1161,13 +1161,14 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       ],
     },
     COMPLEX: {
-      primary: "anthropic/claude-opus-4.7", // Best quality for complex tasks
+      primary: "anthropic/claude-opus-4.8", // Best quality for complex tasks — newest flagship, same $5/$25 as 4.7
       // Fallback chain de-Gemini'd 2026-04-22: when Anthropic 503s, Gemini is
       // also prone to "high demand" 503s (correlated failure — everyone falls
       // back to Google at the same time). Prefer xAI Grok → Moonshot → OpenAI
       // flagship → DeepSeek → NVIDIA free instead.
       fallback: [
-        "anthropic/claude-opus-4.6", // in-family hot swap first
+        "anthropic/claude-opus-4.7", // in-family hot swap first (identical cost)
+        "anthropic/claude-opus-4.6", // in-family hot swap
         "anthropic/claude-sonnet-4.6",
         "xai/grok-4-0709", // 503-resistant flagship
         "moonshot/kimi-k2.6", // Moonshot flagship, independent infra
@@ -1182,6 +1183,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     REASONING: {
       primary: "anthropic/claude-sonnet-4.6", // 2,110ms, $3/$15 - best for reasoning/instructions
       fallback: [
+        "anthropic/claude-opus-4.8", // Newest flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.7", // Flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.6", // 2,139ms
         "xai/grok-4-1-fast-reasoning", // 1,454ms, cheap fast reasoning
@@ -1217,6 +1219,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       // correlate with Anthropic outages (everyone falls back together).
       // Prefer 503-resistant providers first.
       fallback: [
+        "anthropic/claude-opus-4.8", // Newest flagship Opus — in-family hot swap
         "anthropic/claude-opus-4.7", // Flagship Opus — in-family hot swap
         "anthropic/claude-opus-4.6", // 2,139ms
         "xai/grok-4-0709", // 1,348ms — strong tool use, independent infra
@@ -1230,6 +1233,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     REASONING: {
       primary: "anthropic/claude-sonnet-4.6", // 2,110ms — strong tool use + reasoning
       fallback: [
+        "anthropic/claude-opus-4.8", // Newest flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.7", // Flagship Opus w/ adaptive thinking
         "anthropic/claude-opus-4.6", // 2,139ms
         "xai/grok-4-1-fast-reasoning", // 1,454ms

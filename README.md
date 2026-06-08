@@ -391,12 +391,9 @@ No Surf account, no API key — settles directly to Surf's Base treasury in USDC
 | --------------------------------------------- | --------: | ---------: | ---------: | ------- | -------------------------------------------- |
 | nvidia/gpt-oss-120b                           |  **FREE** |   **FREE** |     **$0** | 128K    | default free model                           |
 | nvidia/gpt-oss-20b                            |  **FREE** |   **FREE** |     **$0** | 128K    | smaller, faster                              |
-| nvidia/mistral-small-4-119b                   |  **FREE** |   **FREE** |     **$0** | 131K    | fastest free chat (114 tok/s)                |
-| nvidia/deepseek-v4-pro                        |  **FREE** |   **FREE** |     **$0** | 1M      | reasoning, MMLU-Pro 87.5                     |
+| nvidia/mistral-small-4-119b                   |  **FREE** |   **FREE** |     **$0** | 131K    | ⚠ upstream timing out (2026-06-07)           |
 | nvidia/deepseek-v4-flash                      |  **FREE** |   **FREE** |     **$0** | 1M      | reasoning, ~5x faster than v4-pro            |
-| nvidia/qwen3-next-80b-a3b-thinking            |  **FREE** |   **FREE** |     **$0** | 131K    | reasoning                                    |
 | nvidia/qwen3-coder-480b                       |  **FREE** |   **FREE** |     **$0** | 131K    | coding                                       |
-| nvidia/glm-4.7                                |  **FREE** |   **FREE** |     **$0** | 131K    | reasoning                                    |
 | nvidia/llama-4-maverick                       |  **FREE** |   **FREE** |     **$0** | 131K    | reasoning                                    |
 | nvidia/nemotron-3-nano-omni-30b-a3b-reasoning |  **FREE** |   **FREE** |     **$0** | 256K    | reasoning, **vision** (text+img+video+audio) |
 | openai/gpt-5-nano                             |     $0.05 |      $0.40 |    $0.0002 | 128K    | tools                                        |
@@ -460,7 +457,7 @@ No Surf account, no API key — settles directly to Surf's Base treasury in USDC
 | openai/gpt-5.2-pro          |    $21.00 |    $168.00 |    $0.0945 | 400K    | reasoning, tools                  |
 | openai/gpt-5.4-pro          |    $30.00 |    $180.00 |    $0.1050 | 400K    | reasoning, tools                  |
 
-> **Free tier:** 10 models cost nothing — `/model free` points to gpt-oss-120b, or pick any free model directly (e.g., `/model deepseek-v4-pro` for reasoning, `/model nemotron-omni` for vision, `/model qwen-thinking`, `/model deepseek-v4-flash` for 1M context, `/model mistral-small`).
+> **Free tier:** several NVIDIA-hosted models cost nothing — `/model free` smart-routes across them, or pick one directly (e.g., `/model nemotron-omni` for vision, `/model deepseek-v4-flash` for 1M context, `/model qwen-coder` for coding, `/model maverick`).
 > **Best value:** `gpt-5-nano` and `gemini-2.5-flash-lite` deliver strong results at ~$0.0003/request.
 
 ---
@@ -718,7 +715,7 @@ ClawRouter works with any tool that makes OpenAI-compatible API calls — point 
 
 ### Is ClawRouter free?
 
-ClawRouter itself is free and MIT licensed. You pay only for the LLM API calls routed through it — and 10 NVIDIA-hosted models (`gpt-oss-120b`, `gpt-oss-20b`, `mistral-small-4-119b`, `deepseek-v4-pro`, `deepseek-v4-flash`, `qwen3-next-80b-a3b-thinking`, `qwen3-coder-480b`, `glm-4.7`, `llama-4-maverick`, `nemotron-3-nano-omni-30b-a3b-reasoning`) are completely free. Use `/model free` to smart-route across them, or pick any by name.
+ClawRouter itself is free and MIT licensed. You pay only for the LLM API calls routed through it — and several NVIDIA-hosted models (`gpt-oss-120b`, `gpt-oss-20b`, `deepseek-v4-flash`, `qwen3-coder-480b`, `llama-4-maverick`, `nemotron-3-nano-omni-30b-a3b-reasoning`) are completely free. Use `/model free` to smart-route across them, or pick any by name.
 
 ---
 

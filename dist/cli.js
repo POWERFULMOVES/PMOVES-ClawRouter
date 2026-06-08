@@ -32007,7 +32007,6 @@ var init_top_models = __esm({
       "minimax/minimax-m2.7",
       "free/gpt-oss-120b",
       "free/gpt-oss-20b",
-      "free/mistral-small-4-119b",
       "free/deepseek-v4-flash",
       "free/qwen3-coder-480b",
       "free/llama-4-maverick",
@@ -32249,17 +32248,18 @@ var init_models = __esm({
       "nvidia/glm-4.7": "free/qwen3-coder-480b",
       "nvidia/llama-4-maverick": "free/llama-4-maverick",
       "nvidia/qwen3-next-80b-a3b-thinking": "free/llama-4-maverick",
-      "nvidia/mistral-small-4-119b": "free/mistral-small-4-119b",
+      "nvidia/mistral-small-4-119b": "free/llama-4-maverick",
+      // NVIDIA upstream timing out — hidden + redirected server-side 2026-06-08
       // Retired free IDs → successors (mirror server-side redirects)
       "nvidia/nemotron-ultra-253b": "free/llama-4-maverick",
       "nvidia/nemotron-3-super-120b": "free/llama-4-maverick",
       "nvidia/nemotron-super-49b": "free/llama-4-maverick",
-      "nvidia/mistral-large-3-675b": "free/mistral-small-4-119b",
+      "nvidia/mistral-large-3-675b": "free/llama-4-maverick",
       "nvidia/devstral-2-123b": "free/qwen3-coder-480b",
       "free/nemotron-ultra-253b": "free/llama-4-maverick",
       "free/nemotron-3-super-120b": "free/llama-4-maverick",
       "free/nemotron-super-49b": "free/llama-4-maverick",
-      "free/mistral-large-3-675b": "free/mistral-small-4-119b",
+      "free/mistral-large-3-675b": "free/llama-4-maverick",
       "free/devstral-2-123b": "free/qwen3-coder-480b",
       // Free model shorthand aliases
       "deepseek-free": "free/deepseek-v4-flash",
@@ -32270,14 +32270,14 @@ var init_models = __esm({
       "v4-pro": "free/deepseek-v4-flash",
       // V4 Pro NVIDIA hung → flash
       "v4-flash": "free/deepseek-v4-flash",
-      "mistral-free": "free/mistral-small-4-119b",
+      "mistral-free": "free/llama-4-maverick",
       "glm-free": "free/qwen3-coder-480b",
       "llama-free": "free/llama-4-maverick",
       "qwen-coder": "free/qwen3-coder-480b",
       "qwen-coder-free": "free/qwen3-coder-480b",
       "qwen-thinking": "free/llama-4-maverick",
       "qwen3-next": "free/llama-4-maverick",
-      "mistral-small": "free/mistral-small-4-119b",
+      "mistral-small": "free/llama-4-maverick",
       // Vision-capable free model — BlockRun's first
       "nemotron-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
       "nano-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -33125,15 +33125,6 @@ var init_models = __esm({
         contextWindow: 131072,
         maxOutput: 16384,
         reasoning: true
-      },
-      {
-        id: "free/mistral-small-4-119b",
-        name: "[Free] Mistral Small 4 119B",
-        version: "small-4-119b",
-        inputPrice: 0,
-        outputPrice: 0,
-        contextWindow: 131072,
-        maxOutput: 16384
       },
       {
         // Nemotron 3 Nano Omni: first vision-capable free model. 31B / 3.2B active

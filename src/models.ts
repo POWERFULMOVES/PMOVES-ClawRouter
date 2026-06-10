@@ -23,6 +23,10 @@ export const MODEL_ALIASES: Record<string, string> = {
   "sonnet-4": "anthropic/claude-sonnet-4.6",
   "sonnet-4.6": "anthropic/claude-sonnet-4.6",
   "sonnet-4-6": "anthropic/claude-sonnet-4.6",
+  // Explicit 4.5 pins (distinct model upstream, same pricing as 4.6)
+  "sonnet-4.5": "anthropic/claude-sonnet-4.5",
+  "sonnet-4-5": "anthropic/claude-sonnet-4.5",
+  "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet-4.5",
   opus: "anthropic/claude-opus-4.8",
   "opus-4": "anthropic/claude-opus-4.8",
   "opus-4.8": "anthropic/claude-opus-4.8",
@@ -133,17 +137,17 @@ export const MODEL_ALIASES: Record<string, string> = {
   "nvidia/glm-4.7": "free/qwen3-coder-480b",
   "nvidia/llama-4-maverick": "free/llama-4-maverick",
   "nvidia/qwen3-next-80b-a3b-thinking": "free/llama-4-maverick",
-  "nvidia/mistral-small-4-119b": "free/mistral-small-4-119b",
+  "nvidia/mistral-small-4-119b": "free/llama-4-maverick", // NVIDIA upstream timing out — hidden + redirected server-side 2026-06-08
   // Retired free IDs → successors (mirror server-side redirects)
   "nvidia/nemotron-ultra-253b": "free/llama-4-maverick",
   "nvidia/nemotron-3-super-120b": "free/llama-4-maverick",
   "nvidia/nemotron-super-49b": "free/llama-4-maverick",
-  "nvidia/mistral-large-3-675b": "free/mistral-small-4-119b",
+  "nvidia/mistral-large-3-675b": "free/llama-4-maverick",
   "nvidia/devstral-2-123b": "free/qwen3-coder-480b",
   "free/nemotron-ultra-253b": "free/llama-4-maverick",
   "free/nemotron-3-super-120b": "free/llama-4-maverick",
   "free/nemotron-super-49b": "free/llama-4-maverick",
-  "free/mistral-large-3-675b": "free/mistral-small-4-119b",
+  "free/mistral-large-3-675b": "free/llama-4-maverick",
   "free/devstral-2-123b": "free/qwen3-coder-480b",
   // Free model shorthand aliases
   "deepseek-free": "free/deepseek-v4-flash", // V4 Pro NVIDIA hung 2026-04-30 → flash
@@ -151,14 +155,14 @@ export const MODEL_ALIASES: Record<string, string> = {
   "deepseek-v4-flash": "free/deepseek-v4-flash",
   "v4-pro": "free/deepseek-v4-flash", // V4 Pro NVIDIA hung → flash
   "v4-flash": "free/deepseek-v4-flash",
-  "mistral-free": "free/mistral-small-4-119b",
+  "mistral-free": "free/llama-4-maverick",
   "glm-free": "free/qwen3-coder-480b",
   "llama-free": "free/llama-4-maverick",
   "qwen-coder": "free/qwen3-coder-480b",
   "qwen-coder-free": "free/qwen3-coder-480b",
   "qwen-thinking": "free/llama-4-maverick",
   "qwen3-next": "free/llama-4-maverick",
-  "mistral-small": "free/mistral-small-4-119b",
+  "mistral-small": "free/llama-4-maverick",
   // Vision-capable free model — BlockRun's first
   "nemotron-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
   "nano-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -322,7 +326,7 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
   },
   {
     id: "free",
-    name: "Free → Nemotron Ultra 253B",
+    name: "Free → GPT-OSS 120B",
     inputPrice: 0,
     outputPrice: 0,
     contextWindow: 131_072,
@@ -607,6 +611,19 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     outputPrice: 5.0,
     contextWindow: 200000,
     maxOutput: 8192,
+    vision: true,
+    agentic: true,
+    toolCalling: true,
+  },
+  {
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
+    version: "4.5",
+    inputPrice: 3.0,
+    outputPrice: 15.0,
+    contextWindow: 200000,
+    maxOutput: 64000,
+    reasoning: true,
     vision: true,
     agentic: true,
     toolCalling: true,
@@ -1124,15 +1141,6 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     reasoning: true,
   },
   {
-    id: "free/mistral-small-4-119b",
-    name: "[Free] Mistral Small 4 119B",
-    version: "small-4-119b",
-    inputPrice: 0,
-    outputPrice: 0,
-    contextWindow: 131072,
-    maxOutput: 16384,
-  },
-  {
     // Nemotron 3 Nano Omni: first vision-capable free model. 31B / 3.2B active
     // MoE, 256K context. ChartQA 90.3, DocVQA 95.6, MMMU 70.8. Accepts text,
     // images, video (up to 2min), audio (up to 1hr). Released 2026-04-27.
@@ -1238,9 +1246,15 @@ const ALIAS_MODELS: ModelDefinitionConfig[] = Object.entries(MODEL_ALIASES)
 /**
  * All BlockRun models in OpenClaw format (including aliases).
  * Used for proxy-side resolution (alias → target ID), tool routing, etc.
+ *
+ * Catalog entries shadowed by an identically-keyed alias are excluded:
+ * resolveModelAlias checks MODEL_ALIASES first, so those catalog entries are
+ * unreachable and their metadata (name/pricing) would misadvertise what
+ * callers actually get. The alias-derived entry carries the redirect
+ * target's real metadata instead.
  */
 export const OPENCLAW_MODELS: ModelDefinitionConfig[] = [
-  ...BLOCKRUN_MODELS.map(toOpenClawModel),
+  ...BLOCKRUN_MODELS.filter((m) => !(m.id in MODEL_ALIASES)).map(toOpenClawModel),
   ...ALIAS_MODELS,
 ];
 

@@ -58375,7 +58375,6 @@ var top_models_default = [
   "minimax/minimax-m2.7",
   "free/gpt-oss-120b",
   "free/gpt-oss-20b",
-  "free/mistral-small-4-119b",
   "free/deepseek-v4-flash",
   "free/qwen3-coder-480b",
   "free/llama-4-maverick",
@@ -58404,6 +58403,10 @@ var MODEL_ALIASES = {
   "sonnet-4": "anthropic/claude-sonnet-4.6",
   "sonnet-4.6": "anthropic/claude-sonnet-4.6",
   "sonnet-4-6": "anthropic/claude-sonnet-4.6",
+  // Explicit 4.5 pins (distinct model upstream, same pricing as 4.6)
+  "sonnet-4.5": "anthropic/claude-sonnet-4.5",
+  "sonnet-4-5": "anthropic/claude-sonnet-4.5",
+  "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet-4.5",
   opus: "anthropic/claude-opus-4.8",
   "opus-4": "anthropic/claude-opus-4.8",
   "opus-4.8": "anthropic/claude-opus-4.8",
@@ -58516,17 +58519,18 @@ var MODEL_ALIASES = {
   "nvidia/glm-4.7": "free/qwen3-coder-480b",
   "nvidia/llama-4-maverick": "free/llama-4-maverick",
   "nvidia/qwen3-next-80b-a3b-thinking": "free/llama-4-maverick",
-  "nvidia/mistral-small-4-119b": "free/mistral-small-4-119b",
+  "nvidia/mistral-small-4-119b": "free/llama-4-maverick",
+  // NVIDIA upstream timing out — hidden + redirected server-side 2026-06-08
   // Retired free IDs → successors (mirror server-side redirects)
   "nvidia/nemotron-ultra-253b": "free/llama-4-maverick",
   "nvidia/nemotron-3-super-120b": "free/llama-4-maverick",
   "nvidia/nemotron-super-49b": "free/llama-4-maverick",
-  "nvidia/mistral-large-3-675b": "free/mistral-small-4-119b",
+  "nvidia/mistral-large-3-675b": "free/llama-4-maverick",
   "nvidia/devstral-2-123b": "free/qwen3-coder-480b",
   "free/nemotron-ultra-253b": "free/llama-4-maverick",
   "free/nemotron-3-super-120b": "free/llama-4-maverick",
   "free/nemotron-super-49b": "free/llama-4-maverick",
-  "free/mistral-large-3-675b": "free/mistral-small-4-119b",
+  "free/mistral-large-3-675b": "free/llama-4-maverick",
   "free/devstral-2-123b": "free/qwen3-coder-480b",
   // Free model shorthand aliases
   "deepseek-free": "free/deepseek-v4-flash",
@@ -58537,14 +58541,14 @@ var MODEL_ALIASES = {
   "v4-pro": "free/deepseek-v4-flash",
   // V4 Pro NVIDIA hung → flash
   "v4-flash": "free/deepseek-v4-flash",
-  "mistral-free": "free/mistral-small-4-119b",
+  "mistral-free": "free/llama-4-maverick",
   "glm-free": "free/qwen3-coder-480b",
   "llama-free": "free/llama-4-maverick",
   "qwen-coder": "free/qwen3-coder-480b",
   "qwen-coder-free": "free/qwen3-coder-480b",
   "qwen-thinking": "free/llama-4-maverick",
   "qwen3-next": "free/llama-4-maverick",
-  "mistral-small": "free/mistral-small-4-119b",
+  "mistral-small": "free/llama-4-maverick",
   // Vision-capable free model — BlockRun's first
   "nemotron-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
   "nano-omni": "free/nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -58634,7 +58638,7 @@ var BLOCKRUN_MODELS = [
   },
   {
     id: "free",
-    name: "Free \u2192 Nemotron Ultra 253B",
+    name: "Free \u2192 GPT-OSS 120B",
     inputPrice: 0,
     outputPrice: 0,
     contextWindow: 131072,
@@ -58913,6 +58917,19 @@ var BLOCKRUN_MODELS = [
     outputPrice: 5,
     contextWindow: 2e5,
     maxOutput: 8192,
+    vision: true,
+    agentic: true,
+    toolCalling: true
+  },
+  {
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
+    version: "4.5",
+    inputPrice: 3,
+    outputPrice: 15,
+    contextWindow: 2e5,
+    maxOutput: 64e3,
+    reasoning: true,
     vision: true,
     agentic: true,
     toolCalling: true
@@ -59420,15 +59437,6 @@ var BLOCKRUN_MODELS = [
     reasoning: true
   },
   {
-    id: "free/mistral-small-4-119b",
-    name: "[Free] Mistral Small 4 119B",
-    version: "small-4-119b",
-    inputPrice: 0,
-    outputPrice: 0,
-    contextWindow: 131072,
-    maxOutput: 16384
-  },
-  {
     // Nemotron 3 Nano Omni: first vision-capable free model. 31B / 3.2B active
     // MoE, 256K context. ChartQA 90.3, DocVQA 95.6, MMMU 70.8. Accepts text,
     // images, video (up to 2min), audio (up to 1hr). Released 2026-04-27.
@@ -59510,7 +59518,7 @@ var ALIAS_MODELS = Object.entries(MODEL_ALIASES).map(([alias, targetId]) => {
   return toOpenClawModel({ ...target, id: alias, name: `${alias} \u2192 ${target.name}` });
 }).filter((m) => m !== null);
 var OPENCLAW_MODELS = [
-  ...BLOCKRUN_MODELS.map(toOpenClawModel),
+  ...BLOCKRUN_MODELS.filter((m) => !(m.id in MODEL_ALIASES)).map(toOpenClawModel),
   ...ALIAS_MODELS
 ];
 var TOP_MODELS_SET = new Set(TOP_MODELS);
@@ -73268,6 +73276,7 @@ function createPayFetchWithPreAuth(baseFetch, client, ttlMs = DEFAULT_TTL_MS, op
     }
     const cacheKey2 = `${urlPath}:${requestModel}`;
     const cached = !options?.skipPreAuth ? cache2.get(cacheKey2) : void 0;
+    let rejected402;
     if (cached && Date.now() - cached.cachedAt < ttlMs) {
       try {
         const payload2 = await client.createPaymentPayload(cached.paymentRequired);
@@ -73281,12 +73290,13 @@ function createPayFetchWithPreAuth(baseFetch, client, ttlMs = DEFAULT_TTL_MS, op
           return response2;
         }
         cache2.delete(cacheKey2);
+        rejected402 = response2;
       } catch {
         cache2.delete(cacheKey2);
       }
     }
     const clonedRequest = request.clone();
-    const response = await baseFetch(request);
+    const response = rejected402 ?? await baseFetch(request);
     if (response.status !== 402) {
       return response;
     }
@@ -77775,19 +77785,25 @@ async function checkForUpdates() {
 }
 
 // src/exclude-models.ts
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, statSync } from "fs";
 import { join as join7, dirname as dirname2 } from "path";
 import { homedir as homedir4 } from "os";
 var DEFAULT_FILE_PATH = join7(homedir4(), ".openclaw", "blockrun", "exclude-models.json");
+var loadCache = /* @__PURE__ */ new Map();
 function loadExcludeList(filePath = DEFAULT_FILE_PATH) {
   try {
+    const mtimeMs = statSync(filePath).mtimeMs;
+    const cached = loadCache.get(filePath);
+    if (cached && cached.mtimeMs === mtimeMs) {
+      return new Set(cached.set);
+    }
     const raw = readFileSync(filePath, "utf-8");
     const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) {
-      return new Set(arr.filter((x) => typeof x === "string"));
-    }
-    return /* @__PURE__ */ new Set();
+    const set = Array.isArray(arr) ? new Set(arr.filter((x) => typeof x === "string")) : /* @__PURE__ */ new Set();
+    loadCache.set(filePath, { mtimeMs, set });
+    return new Set(set);
   } catch {
+    loadCache.delete(filePath);
     return /* @__PURE__ */ new Set();
   }
 }
@@ -77796,6 +77812,7 @@ function saveExcludeList(set, filePath) {
   const dir = dirname2(filePath);
   mkdirSync(dir, { recursive: true });
   writeFileSync(filePath, JSON.stringify(sorted, null, 2) + "\n", "utf-8");
+  loadCache.delete(filePath);
 }
 function addExclusion(model, filePath = DEFAULT_FILE_PATH) {
   const resolved = resolveModelAlias(model);
@@ -78623,6 +78640,7 @@ function toUpstreamModelId(modelId) {
 var MAX_MESSAGES = 200;
 var CONTEXT_LIMIT_KB = 5120;
 var HEARTBEAT_INTERVAL_MS = 2e3;
+var BALANCE_CHECK_TIMEOUT_MS = 2500;
 var DEFAULT_REQUEST_TIMEOUT_MS = 3e5;
 var PER_MODEL_TIMEOUT_MS = 6e4;
 var REASONING_MODEL_TIMEOUT_MS = 18e4;
@@ -78657,6 +78675,10 @@ async function readBodyWithTimeout(body, timeoutMs = MODEL_BODY_READ_TIMEOUT_MS)
       if (result.done) break;
       chunks.push(result.value);
     }
+  } catch (err) {
+    await reader.cancel().catch(() => {
+    });
+    throw err;
   } finally {
     clearTimeout(timer);
     reader.releaseLock();
@@ -79270,8 +79292,9 @@ function buildCostBreakdown(params) {
     ...tier ? { tier } : {}
   };
 }
+var BLOCKRUN_MODEL_BY_ID = new Map(BLOCKRUN_MODELS.map((m) => [m.id, m]));
 function estimateAmount(modelId, bodyLength, maxTokens) {
-  const model = BLOCKRUN_MODELS.find((m) => m.id === modelId);
+  const model = BLOCKRUN_MODEL_BY_ID.get(modelId);
   if (!model) return void 0;
   let costUsd;
   const promoPrice = getActivePromoPrice(model);
@@ -79293,6 +79316,10 @@ var IMAGE_PRICING = {
   "openai/gpt-image-1": {
     default: 0.02,
     sizes: { "1024x1024": 0.02, "1536x1024": 0.04, "1024x1536": 0.04 }
+  },
+  "openai/gpt-image-2": {
+    default: 0.06,
+    sizes: { "1024x1024": 0.06, "1536x1024": 0.12, "1024x1536": 0.12 }
   },
   "black-forest/flux-1.1-pro": { default: 0.04 },
   "google/nano-banana": { default: 0.05 },
@@ -79319,14 +79346,14 @@ var VIDEO_PRICING = {
   "bytedance/seedance-1.5-pro": { pricePerSecond: 0.0875, defaultDurationSeconds: 5 },
   "bytedance/seedance-2.0-fast": {
     pricePerSecond: 0.22687,
-    pricePerSecondImageInput: 0.13369,
     defaultDurationSeconds: 5
   },
   "bytedance/seedance-2.0": {
     pricePerSecond: 0.28358,
-    pricePerSecondImageInput: 0.1742,
     defaultDurationSeconds: 5
-  }
+  },
+  // Sora 2 via Azure AI Foundry — flat $0.10/s for both t2v and i2v.
+  "azure/sora-2": { pricePerSecond: 0.1, defaultDurationSeconds: 4 }
 };
 var PHONE_PRICING = {
   "phone/lookup/fraud": 0.05,
@@ -79390,14 +79417,20 @@ async function proxyPaidApiRequest(req, res, apiBase, payFetch, getActualPayment
   if (!headers["content-type"]) headers["content-type"] = "application/json";
   headers["user-agent"] = USER_AGENT;
   console.log(`[ClawRouter] ${requestLabel} request: ${req.method} ${req.url}`);
+  const clientAbort = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) clientAbort.abort();
+  });
   const upstream = await payFetch(upstreamUrl, {
     method: req.method ?? "POST",
     headers,
-    body: body.length > 0 ? new Uint8Array(body) : void 0
+    body: body.length > 0 ? new Uint8Array(body) : void 0,
+    signal: clientAbort.signal
   });
   const responseHeaders = {};
   upstream.headers.forEach((value, key) => {
-    if (key === "transfer-encoding" || key === "connection" || key === "content-encoding") return;
+    if (key === "transfer-encoding" || key === "connection" || key === "content-encoding" || key === "content-length")
+      return;
     responseHeaders[key] = value;
   });
   res.writeHead(upstream.status, responseHeaders);
@@ -79590,7 +79623,7 @@ async function startProxy(options) {
   const sessionJournal = new SessionJournal();
   const connections = /* @__PURE__ */ new Set();
   const server = createServer((req, res) => {
-    paymentStore.run({ amountUsd: 0 }, async () => {
+    const handled = paymentStore.run({ amountUsd: 0 }, async () => {
       req.on("error", (err) => {
         console.error(`[ClawRouter] Request stream error: ${err.message}`);
       });
@@ -79876,6 +79909,10 @@ async function startProxy(options) {
       }
       if (req.url === "/v1/images/generations" && req.method === "POST") {
         const imgStartTime = Date.now();
+        const clientAbort = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) clientAbort.abort();
+        });
         const chunks = [];
         for await (const chunk of req) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -79894,7 +79931,8 @@ async function startProxy(options) {
           const upstream = await payFetch(`${apiBase}/v1/images/generations`, {
             method: "POST",
             headers: { "content-type": "application/json", "user-agent": USER_AGENT },
-            body: reqBody
+            body: reqBody,
+            signal: clientAbort.signal
           });
           const text = await upstream.text();
           if (!upstream.ok && upstream.status !== 202) {
@@ -79922,9 +79960,16 @@ async function startProxy(options) {
             let pollError;
             let completed = false;
             while (Date.now() < pollDeadline) {
+              if (clientAbort.signal.aborted) {
+                console.log(
+                  `[ClawRouter] Client disconnected \u2014 abandoning image poll (id=${result.id})`
+                );
+                return;
+              }
               const pollResp = await payFetch(pollUrl, {
                 method: "GET",
-                headers: { "user-agent": USER_AGENT }
+                headers: { "user-agent": USER_AGENT },
+                signal: clientAbort.signal
               });
               const pollText = await pollResp.text();
               let pollBody = {};
@@ -80018,6 +80063,7 @@ async function startProxy(options) {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(result));
         } catch (err) {
+          if (clientAbort.signal.aborted) return;
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[ClawRouter] Image generation error: ${msg}`);
           if (!res.headersSent) {
@@ -80225,6 +80271,10 @@ async function startProxy(options) {
       }
       if (req.url === "/v1/videos/generations" && req.method === "POST") {
         const videoStartTime = Date.now();
+        const clientAbort = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) clientAbort.abort();
+        });
         const chunks = [];
         for await (const chunk of req) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -80244,7 +80294,8 @@ async function startProxy(options) {
           const submitResp = await payFetch(`${apiBase}/v1/videos/generations`, {
             method: "POST",
             headers: { "content-type": "application/json", "user-agent": USER_AGENT },
-            body: reqBody
+            body: reqBody,
+            signal: clientAbort.signal
           });
           const submitText = await submitResp.text();
           if (!submitResp.ok && submitResp.status !== 202) {
@@ -80271,10 +80322,18 @@ async function startProxy(options) {
             const pollInterval = 5e3;
             await new Promise((r) => setTimeout(r, 3e3));
             let pollError;
+            let videoCompleted = false;
             while (Date.now() < pollDeadline) {
+              if (clientAbort.signal.aborted) {
+                console.log(
+                  `[ClawRouter] Client disconnected \u2014 abandoning video poll (id=${submitResult.id})`
+                );
+                return;
+              }
               const pollResp = await payFetch(pollUrl, {
                 method: "GET",
-                headers: { "user-agent": USER_AGENT }
+                headers: { "user-agent": USER_AGENT },
+                signal: clientAbort.signal
               });
               const pollText = await pollResp.text();
               let pollBody = {};
@@ -80294,6 +80353,7 @@ async function startProxy(options) {
               }
               if (pollResp.ok && pollBody.status === "completed") {
                 finalResult = pollBody;
+                videoCompleted = true;
                 break;
               }
               if (!pollResp.ok) {
@@ -80302,6 +80362,7 @@ async function startProxy(options) {
                 return;
               }
               finalResult = pollBody;
+              videoCompleted = true;
               break;
             }
             if (pollError) {
@@ -80309,7 +80370,7 @@ async function startProxy(options) {
               res.end(JSON.stringify({ error: "Video generation failed", details: pollError }));
               return;
             }
-            if (!finalResult.data) {
+            if (!videoCompleted) {
               res.writeHead(504, { "Content-Type": "application/json" });
               res.end(
                 JSON.stringify({
@@ -80358,6 +80419,7 @@ async function startProxy(options) {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(finalResult));
         } catch (err) {
+          if (clientAbort.signal.aborted) return;
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[ClawRouter] Video generation error: ${msg}`);
           if (!res.headersSent) {
@@ -80388,6 +80450,8 @@ async function startProxy(options) {
                 error: { message: `Partner proxy error: ${error.message}`, type: "partner_error" }
               })
             );
+          } else if (!res.writableEnded) {
+            res.end();
           }
         }
         return;
@@ -80430,6 +80494,24 @@ async function startProxy(options) {
           res.write("data: [DONE]\n\n");
           res.end();
         }
+      }
+    });
+    handled.catch((err) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error(`[ClawRouter] Unhandled request error: ${error.message}`);
+      options.onError?.(error);
+      try {
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: { message: `Proxy error: ${error.message}`, type: "proxy_error" }
+            })
+          );
+        } else if (!res.writableEnded) {
+          res.end();
+        }
+      } catch {
       }
     });
   });
@@ -81482,6 +81564,38 @@ async function proxyRequest(req, res, apiBase, payFetch, options, routerOpts, de
   }
   const inflight = deduplicator.getInflight(dedupKey);
   if (inflight) {
+    if (isStreaming) {
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive"
+      });
+      safeWrite(res, ": heartbeat\n\n");
+      const waiterHeartbeat = setInterval(() => {
+        if (canWrite(res)) {
+          safeWrite(res, ": heartbeat\n\n");
+        } else {
+          clearInterval(waiterHeartbeat);
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+      try {
+        const result2 = await inflight;
+        if (canWrite(res)) {
+          if (result2.status === 200) {
+            safeWrite(res, result2.body);
+          } else {
+            safeWrite(res, `data: ${result2.body.toString()}
+
+`);
+            safeWrite(res, "data: [DONE]\n\n");
+          }
+        }
+        res.end();
+      } finally {
+        clearInterval(waiterHeartbeat);
+      }
+      return;
+    }
     const result = await inflight;
     res.writeHead(result.status, result.headers);
     res.end(result.body);
@@ -81496,12 +81610,25 @@ async function proxyRequest(req, res, apiBase, payFetch, options, routerOpts, de
       estimatedCostMicros = BigInt(estimated);
       const bufferedCostMicros = estimatedCostMicros * BigInt(Math.ceil(BALANCE_CHECK_BUFFER * 100)) / 100n;
       let sufficiency = null;
+      let balanceCheckTimer;
       try {
-        sufficiency = await balanceMonitor.checkSufficient(bufferedCostMicros);
+        sufficiency = await Promise.race([
+          balanceMonitor.checkSufficient(bufferedCostMicros),
+          new Promise((resolve) => {
+            balanceCheckTimer = setTimeout(() => {
+              console.warn(
+                `[ClawRouter] Balance check exceeded ${BALANCE_CHECK_TIMEOUT_MS}ms \u2014 proceeding optimistically`
+              );
+              resolve(null);
+            }, BALANCE_CHECK_TIMEOUT_MS);
+          })
+        ]);
       } catch (balanceErr) {
         console.warn(
           `[ClawRouter] Balance check failed (${balanceErr instanceof Error ? balanceErr.message : String(balanceErr)}) \u2014 proceeding optimistically`
         );
+      } finally {
+        clearTimeout(balanceCheckTimer);
       }
       if (sufficiency && (sufficiency.info.isEmpty || !sufficiency.sufficient)) {
         const freeFallback = pickFreeModel(loadExcludeList()) ?? FREE_MODEL;
@@ -81512,7 +81639,7 @@ async function proxyRequest(req, res, apiBase, payFetch, options, routerOpts, de
         modelId = freeFallback;
         isFreeModel = true;
         const parsed = JSON.parse(body.toString());
-        parsed.model = toUpstreamModelId(FREE_MODEL);
+        parsed.model = toUpstreamModelId(freeFallback);
         body = Buffer.from(JSON.stringify(parsed));
         const walletAddr = sufficiency.info.walletAddress;
         const fundHint = walletAddr ? ` Send USDC to \`${walletAddr}\`.` : " Run `/wallet` to see your address.";
@@ -81799,6 +81926,8 @@ data: [DONE]
           res.end(errPayload);
         }
         deduplicator.removeInflight(dedupKey);
+        clearTimeout(timeoutId);
+        req.removeListener("close", onClientClose);
         return;
       }
       if (excluded.length > 0) {
@@ -82016,7 +82145,7 @@ data: [DONE]
                 upstream = retryResult.response;
                 actualModelUsed = tryModel;
                 console.log(`[ClawRouter] Rate-limit retry succeeded for: ${tryModel}`);
-                if (options.maxCostPerRunUsd && effectiveSessionId && tryModel !== FREE_MODEL) {
+                if (options.maxCostPerRunUsd && effectiveSessionId && !FREE_MODELS.has(tryModel)) {
                   const costEst = estimateAmount(tryModel, body.length, maxTokens);
                   if (costEst) {
                     sessionStore.addSessionCost(effectiveSessionId, BigInt(costEst));
@@ -82571,7 +82700,7 @@ data: [DONE]
     if (actualPayment > 0) {
       logCost = actualPayment;
       const chargedInputTokens = Math.ceil(body.length / 4);
-      const modelDef = BLOCKRUN_MODELS.find((m) => m.id === logModel);
+      const modelDef = BLOCKRUN_MODEL_BY_ID.get(logModel);
       const chargedOutputTokens = modelDef ? Math.min(maxTokens, modelDef.maxOutput) : maxTokens;
       const baseline = calculateModelCost(
         logModel,

@@ -4,6 +4,41 @@ All notable changes to ClawRouter.
 
 ---
 
+## v0.12.206 — June 10, 2026
+
+End-to-end audit sweep: 4 proxy reliability fixes (each TDD'd with a new regression test), abort/teardown hardening, registry realignment with the gateway, and doc/count sync. 596 tests passing (8 new).
+
+### Proxy reliability (all in `src/proxy.ts` unless noted)
+
+- **Process-crash fix: escaped rejections from the request handler.** The `paymentStore.run(async () => …)` promise wrapping every request was never `.catch()`ed, and the media endpoints (`/v1/images/generations`, `image2image`, `audio`, `videos`) read the request body **outside** their `try` blocks — a client aborting mid-upload rejected the body iterator, escaped the handler, and became an `unhandledRejection`, which kills the whole proxy under Node's default semantics. A safety-net `.catch()` now logs, replies 500 when possible, and never lets a rejection escape. (Test: `proxy.aborted-upload.test.ts`.)
+- **Partner-API corruption: `content-length` forwarded after fetch decompression.** `proxyPaidApiRequest` stripped `content-encoding` but kept `content-length`, so any gzipped upstream response (pm/exa/surf/phone/…) reached the client with the _compressed_ length and _decompressed_ bytes → truncated JSON. `content-length` joins the skip list; Node chunks instead. (Test: `proxy.partner-gzip.test.ts`.)
+- **Client abort now cancels upstream work in the media + partner paths.** The image/video 202-poll loops kept polling after the client disconnected — and the first `completed` poll **settles the x402 payment**, charging the user for a clip nobody will receive. Both loops (and the partner proxy + media submit calls) now thread an `AbortController` tied to `res` close, bail before the next poll, and pass `signal` into `payFetch`. (Test: `proxy.poll-abort.test.ts`.)
+- **Streaming dedup waiters get heartbeats.** A streaming retry that attached to an in-flight identical request waited in silence (no headers, no bytes) for up to minutes — recreating the OpenClaw ~10-15s timeout/retry storm the heartbeat mechanism exists to prevent, and stacking more waiters each round. Waiters now receive SSE headers + `: heartbeat` comments immediately and replay the original's transcript when it lands. (Test: `proxy.dedup-streaming.test.ts`.)
+- **Balance check time-bounded at 2.5s** (`BALANCE_CHECK_TIMEOUT_MS`). The pre-request balance check runs before SSE headers; a slow RPC (Solana retry ladder ≈ 34s worst case, and zero balances are never cached) starved streaming clients of their first byte. On expiry the request proceeds optimistically; the in-flight RPC still warms the monitor cache. (Test: `proxy.balance-check-latency.test.ts`, via the existing `_balanceMonitorOverride` seam.)
+- **Teardown/leak batch:** partner proxy now `res.end()`s after a mid-stream body-read timeout instead of hanging the client until socket timeout; `readBodyWithTimeout` cancels the stream on timeout (was leaking the undici connection until GC); the budget second-pass 429 path releases the global timeout + close listener; the empty-wallet fallback writes the exclude-aware `freeFallback` pick into the body instead of the hardcoded `FREE_MODEL` (latent exclude-list bypass); the 429-retry success path uses `FREE_MODELS.has()` like its siblings (phantom ~$0.001 session-budget entries); the video poll loop tracks an explicit `completed` flag so a completed-but-empty job no longer reports as "timed out"; `payment-preauth.ts` reuses the rejected pre-auth 402 (which already carries fresh requirements) instead of buying an identical 402 with an extra unpaid round trip.
+- **Hot-path perf:** `estimateAmount` now uses a module-level `Map` (the budget pre-check scanned `BLOCKRUN_MODELS` linearly per model → O(n²) per request); `loadExcludeList` (`src/exclude-models.ts`) gained an mtime-validated cache.
+
+### Registry / pricing (gateway alignment, blockrun = source of truth)
+
+- **`anthropic/claude-sonnet-4.5` added** ($3/$15, 200K ctx, vision) — public upstream since the 4.6 launch but missing here entirely; same gap class v0.12.167 fixed for opus-4.5. Pins: `sonnet-4.5`, `sonnet-4-5`, `anthropic/claude-sonnet-4-5`. Bare `sonnet` stays on 4.6; not picker-listed (superseded tier).
+- **Seedance i2v telemetry rates un-discounted** — blockrun `403e61e` (2026-06-01) removed the image-to-video discount; the stale `pricePerSecondImageInput` rows (0.13369/0.1742) under-logged i2v cost ~41%. i2v now logs at the text rate. Telemetry-only (payments are server-dictated). Known remaining gap, documented in the comment: blockrun's `RESOLUTION_TOKEN_FACTOR` (1080p = 2.25×) still isn't modeled.
+- **`azure/sora-2` added to `VIDEO_PRICING`** ($0.10/s flat, 4s default — a 12s clip was falling back to the generic ~$0.42 telemetry row) and **`openai/gpt-image-2` added to `IMAGE_PRICING`** ($0.06 / $0.12 by size). Both added to README + SKILL docs.
+- **Duplicate-id picker entries eliminated** (`src/models.ts`): catalog entries shadowed by an identically-keyed alias (`free`, `openai/o1-mini`, `google/gemini-3-pro-preview`, `nvidia/kimi-k2.5`) are now excluded from `OPENCLAW_MODELS` — `resolveModelAlias` checks aliases first, so those catalog entries were unreachable and advertised the _old_ model's metadata while callers got the redirect target. The picker's double `free` row is gone (39 → 38 = `top-models.json`), and the surviving `free` entry finally says **GPT-OSS 120B** instead of the retired "Nemotron Ultra 253B". (Tests added in `models.test.ts`.)
+
+### Docs / cleanup
+
+- **Free-model count corrected everywhere: 6** (was variously 8, 9, and 10 across README badges/prose and SKILL.md — stale since the 2026-06-07 sweep). README profile table AUTO·MEDIUM cell synced to `kimi-k2.6 ($0.95/$4.00)` (changed in v0.12.174); ECO·REASONING cell named the actual primary (`grok-4-1-fast-reasoning`); doctor sample output and CLAUDE.md now say Node 22 (floor raised in #183).
+- **Dead code removed:** `src/router/llm-classifier.ts` (designed LLM-fallback classifier, never wired), the vestigial `walletKeyAuth`/`envKeyAuth` interactive auth methods in `src/auth.ts`, `decompressContent` (codebook), `generatePathMapHeader` (paths); two internal-only functions un-exported.
+- **`@noble/hashes` declared as a direct dependency** — `src/wallet.ts` imports it directly but it only resolved via `@scure/*` hoisting (phantom dep; masked at runtime by tsup bundling). Stale tsconfig `exclude` of `error-classification.test.ts` dropped (it typechecks fine).
+
+---
+
+## v0.12.205 — June 8, 2026
+
+Finished de-listing `nvidia/mistral-small-4-119b` after the gateway hid + redirected it (2026-06-08).
+
+- **`nvidia/mistral-small-4-119b` fully de-listed** — the gateway now marks it `hidden` and server-redirects it to `nvidia/llama-4-maverick` (NVIDIA upstream timing out, 3/3 probes >60s). All five alias targets that still resolved to `free/mistral-small-4-119b` (`nvidia/mistral-small-4-119b`, `nvidia/mistral-large-3-675b`, `free/mistral-large-3-675b`, `mistral-free`, `mistral-small`) now resolve to `free/llama-4-maverick`, matching the gateway. Removed from the model catalog and the `/model` picker (`top-models.json`); README budget row dropped. (Test pricing fixture kept as a generic $0 entry.)
+
 ## v0.12.204 — June 8, 2026
 
 Free-tier routing realigned to the backend's 2026-06-07 model sweep.

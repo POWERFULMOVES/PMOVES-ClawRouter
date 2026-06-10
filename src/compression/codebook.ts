@@ -126,17 +126,3 @@ export function generateCodebookHeader(
 
   return parts.join("\n");
 }
-
-/**
- * Decompress a string using the codebook (for logging).
- */
-export function decompressContent(
-  content: string,
-  codebook: Record<string, string> = STATIC_CODEBOOK,
-): string {
-  let result = content;
-  for (const [code, phrase] of Object.entries(codebook)) {
-    result = result.split(code).join(phrase);
-  }
-  return result;
-}

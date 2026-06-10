@@ -157,6 +157,10 @@ function toUpstreamModelId(modelId: string): string {
 const MAX_MESSAGES = 200; // BlockRun API limit - truncate older messages if exceeded
 const CONTEXT_LIMIT_KB = 5120; // Server-side limit: 5MB in KB
 const HEARTBEAT_INTERVAL_MS = 2_000;
+// Hard ceiling on the pre-request balance check. It runs before SSE headers
+// are flushed, so a slow RPC must not eat into OpenClaw's ~10-15s silence
+// timeout. On expiry the request proceeds optimistically.
+const BALANCE_CHECK_TIMEOUT_MS = 2_500;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000; // 5 minutes (allows reasoning model first-attempt + non-reasoning fallback)
 const PER_MODEL_TIMEOUT_MS = 60_000; // 60s per non-reasoning model attempt (fallback to next on exceed)
 const REASONING_MODEL_TIMEOUT_MS = 180_000; // 3min per reasoning model attempt — first-token cold-start can take 60-120s on V4 Pro / Claude opus thinking / GPT-5 reasoning_effort=high
@@ -199,6 +203,11 @@ async function readBodyWithTimeout(
       if (result.done) break;
       chunks.push(result.value);
     }
+  } catch (err) {
+    // Cancel the stream so the underlying connection is released instead of
+    // buffering until GC (releaseLock alone leaves it open).
+    await reader.cancel().catch(() => {});
+    throw err;
   } finally {
     clearTimeout(timer);
     reader.releaseLock();
@@ -1422,6 +1431,10 @@ export function buildCostBreakdown(params: {
   };
 }
 
+/** Model lookup by id — estimateAmount runs in per-request loops (the budget
+ *  pre-check scans every model), so a linear find would be O(n²) per request. */
+const BLOCKRUN_MODEL_BY_ID = new Map(BLOCKRUN_MODELS.map((m) => [m.id, m]));
+
 /**
  * Estimate USDC cost for a request based on model pricing.
  * Returns amount string in USDC smallest unit (6 decimals) or undefined if unknown.
@@ -1431,7 +1444,7 @@ function estimateAmount(
   bodyLength: number,
   maxTokens: number,
 ): string | undefined {
-  const model = BLOCKRUN_MODELS.find((m) => m.id === modelId);
+  const model = BLOCKRUN_MODEL_BY_ID.get(modelId);
   if (!model) return undefined;
 
   let costUsd: number;
@@ -1465,6 +1478,10 @@ const IMAGE_PRICING: Record<string, { default: number; sizes?: Record<string, nu
     default: 0.02,
     sizes: { "1024x1024": 0.02, "1536x1024": 0.04, "1024x1536": 0.04 },
   },
+  "openai/gpt-image-2": {
+    default: 0.06,
+    sizes: { "1024x1024": 0.06, "1536x1024": 0.12, "1024x1536": 0.12 },
+  },
   "black-forest/flux-1.1-pro": { default: 0.04 },
   "google/nano-banana": { default: 0.05 },
   "google/nano-banana-pro": {
@@ -1493,9 +1510,11 @@ const IMAGE_PRICING: Record<string, { default: number; sizes?: Record<string, nu
 // As of blockrun e6dc1f1 (2026-05-22) the videos route defaults Seedance to
 // resolution=720p + generate_audio=true(t2v) / false(i2v), which doubles the
 // per-second token count from 10128 → 20256 vs. the older 480p baseline.
-// pricePerSecondImageInput, when set, is used if the request body has image_url
-// (image-to-video tokenizes ~40% cheaper on 2.0 variants; 1.5 Pro is flat
-// because token360 prices its text and image inputs at the same per-M rate).
+// pricePerSecondImageInput, when set, is used if the request body has image_url.
+// Since blockrun 403e61e (2026-06-01) image-to-video is NOT discounted upstream
+// (only video-to-video is cheaper) — i2v rates equal the text rates.
+// Telemetry-only caveat: blockrun's RESOLUTION_TOKEN_FACTOR (1080p = 2.25×) is
+// not modeled here, so non-720p clips under-log; payment is server-dictated.
 const VIDEO_PRICING: Record<
   string,
   {
@@ -1508,14 +1527,14 @@ const VIDEO_PRICING: Record<
   "bytedance/seedance-1.5-pro": { pricePerSecond: 0.0875, defaultDurationSeconds: 5 },
   "bytedance/seedance-2.0-fast": {
     pricePerSecond: 0.22687,
-    pricePerSecondImageInput: 0.13369,
     defaultDurationSeconds: 5,
   },
   "bytedance/seedance-2.0": {
     pricePerSecond: 0.28358,
-    pricePerSecondImageInput: 0.1742,
     defaultDurationSeconds: 5,
   },
+  // Sora 2 via Azure AI Foundry — flat $0.10/s for both t2v and i2v.
+  "azure/sora-2": { pricePerSecond: 0.1, defaultDurationSeconds: 4 },
 };
 
 // Phone & Voice pricing (must match server's PHONE_PRICING/BLAND_PRICING in
@@ -1665,16 +1684,32 @@ async function proxyPaidApiRequest(
 
   console.log(`[ClawRouter] ${requestLabel} request: ${req.method} ${req.url}`);
 
+  // Cancel the upstream call (and its payment) if the client disconnects.
+  const clientAbort = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) clientAbort.abort();
+  });
+
   const upstream = await payFetch(upstreamUrl, {
     method: req.method ?? "POST",
     headers,
     body: body.length > 0 ? new Uint8Array(body) : undefined,
+    signal: clientAbort.signal,
   });
 
-  // Forward response headers
+  // Forward response headers. content-length must be dropped along with
+  // content-encoding: fetch transparently decompresses the body, so the
+  // upstream length describes the compressed bytes — forwarding it would
+  // truncate the decompressed response. Node falls back to chunked encoding.
   const responseHeaders: Record<string, string> = {};
   upstream.headers.forEach((value, key) => {
-    if (key === "transfer-encoding" || key === "connection" || key === "content-encoding") return;
+    if (
+      key === "transfer-encoding" ||
+      key === "connection" ||
+      key === "content-encoding" ||
+      key === "content-length"
+    )
+      return;
     responseHeaders[key] = value;
   });
 
@@ -1977,7 +2012,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     // Wrap in paymentStore.run() so x402 hook can write actual payment amount per-request
-    paymentStore.run({ amountUsd: 0 }, async () => {
+    const handled: Promise<void> = paymentStore.run({ amountUsd: 0 }, async () => {
       // Add stream error handlers to prevent server crashes
       req.on("error", (err) => {
         console.error(`[ClawRouter] Request stream error: ${err.message}`);
@@ -2311,6 +2346,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       // Cost is charged via x402 micropayment directly — no session accumulation or cap enforcement.
       if (req.url === "/v1/images/generations" && req.method === "POST") {
         const imgStartTime = Date.now();
+        // Stop all upstream work if the client goes away — especially the poll
+        // loop below, whose first `completed` poll settles the x402 payment.
+        const clientAbort = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) clientAbort.abort();
+        });
         const chunks: Buffer[] = [];
         for await (const chunk of req) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -2335,6 +2376,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
             method: "POST",
             headers: { "content-type": "application/json", "user-agent": USER_AGENT },
             body: reqBody,
+            signal: clientAbort.signal,
           });
           const text = await upstream.text();
           if (!upstream.ok && upstream.status !== 202) {
@@ -2376,9 +2418,16 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
             let pollError: string | undefined;
             let completed = false;
             while (Date.now() < pollDeadline) {
+              if (clientAbort.signal.aborted) {
+                console.log(
+                  `[ClawRouter] Client disconnected — abandoning image poll (id=${result.id})`,
+                );
+                return;
+              }
               const pollResp = await payFetch(pollUrl, {
                 method: "GET",
                 headers: { "user-agent": USER_AGENT },
+                signal: clientAbort.signal,
               });
               const pollText = await pollResp.text();
               let pollBody: typeof result & { error?: string } = {};
@@ -2485,6 +2534,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(result));
         } catch (err) {
+          if (clientAbort.signal.aborted) return; // client gone — nothing to report
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[ClawRouter] Image generation error: ${msg}`);
           if (!res.headersSent) {
@@ -2726,6 +2776,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       // polling happens server-side and the client sees one HTTP round-trip.
       if (req.url === "/v1/videos/generations" && req.method === "POST") {
         const videoStartTime = Date.now();
+        // Stop all upstream work if the client goes away — especially the poll
+        // loop below, whose first `completed` poll settles the x402 payment.
+        const clientAbort = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) clientAbort.abort();
+        });
         const chunks: Buffer[] = [];
         for await (const chunk of req) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -2749,6 +2805,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
             method: "POST",
             headers: { "content-type": "application/json", "user-agent": USER_AGENT },
             body: reqBody,
+            signal: clientAbort.signal,
           });
           const submitText = await submitResp.text();
           if (!submitResp.ok && submitResp.status !== 202) {
@@ -2792,10 +2849,18 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
             // Small initial delay so the upstream has a chance to start.
             await new Promise((r) => setTimeout(r, 3_000));
             let pollError: string | undefined;
+            let videoCompleted = false;
             while (Date.now() < pollDeadline) {
+              if (clientAbort.signal.aborted) {
+                console.log(
+                  `[ClawRouter] Client disconnected — abandoning video poll (id=${submitResult.id})`,
+                );
+                return;
+              }
               const pollResp = await payFetch(pollUrl, {
                 method: "GET",
                 headers: { "user-agent": USER_AGENT },
+                signal: clientAbort.signal,
               });
               const pollText = await pollResp.text();
               let pollBody: typeof submitResult & { error?: string } = {};
@@ -2819,6 +2884,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
               }
               if (pollResp.ok && pollBody.status === "completed") {
                 finalResult = pollBody;
+                videoCompleted = true;
                 break;
               }
               // Any other non-OK: surface it.
@@ -2829,6 +2895,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
               }
               // OK but no known status — treat as final and hand through.
               finalResult = pollBody;
+              videoCompleted = true;
               break;
             }
             if (pollError) {
@@ -2836,7 +2903,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
               res.end(JSON.stringify({ error: "Video generation failed", details: pollError }));
               return;
             }
-            if (!finalResult.data) {
+            // Explicit completed flag (not finalResult.data) — a job that
+            // completes with an empty payload is "completed", not "timed out".
+            if (!videoCompleted) {
               res.writeHead(504, { "Content-Type": "application/json" });
               res.end(
                 JSON.stringify({
@@ -2892,6 +2961,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(finalResult));
         } catch (err) {
+          if (clientAbort.signal.aborted) return; // client gone — nothing to report
           const msg = err instanceof Error ? err.message : String(err);
           console.error(`[ClawRouter] Video generation error: ${msg}`);
           if (!res.headersSent) {
@@ -2931,6 +3001,10 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
                 error: { message: `Partner proxy error: ${error.message}`, type: "partner_error" },
               }),
             );
+          } else if (!res.writableEnded) {
+            // Headers already sent (e.g. body-read timeout mid-stream) — end the
+            // response instead of leaving the client hanging until socket timeout.
+            res.end();
           }
         }
         return;
@@ -2978,6 +3052,29 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
         }
       }
     }); // end paymentStore.run()
+
+    // Safety net: rejections that escape the handler (e.g. the request-body
+    // async iterator rejecting when a client aborts mid-upload) must never
+    // become unhandledRejections — that kills the whole proxy process.
+    handled.catch((err: unknown) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error(`[ClawRouter] Unhandled request error: ${error.message}`);
+      options.onError?.(error);
+      try {
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: { message: `Proxy error: ${error.message}`, type: "proxy_error" },
+            }),
+          );
+        } else if (!res.writableEnded) {
+          res.end();
+        }
+      } catch {
+        // Socket already gone — nothing left to clean up
+      }
+    });
   });
 
   // Listen on configured port with retry logic for TIME_WAIT handling
@@ -4431,6 +4528,42 @@ async function proxyRequest(
   // Check in-flight — wait for the original request to complete
   const inflight = deduplicator.getInflight(dedupKey);
   if (inflight) {
+    if (isStreaming) {
+      // The original may take minutes (reasoning models get 180s/attempt).
+      // Waiting silently recreates the client-timeout/retry storm the
+      // heartbeat mechanism exists to prevent — send SSE headers and
+      // heartbeats while we wait, then replay the finished transcript.
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      });
+      safeWrite(res, ": heartbeat\n\n");
+      const waiterHeartbeat = setInterval(() => {
+        if (canWrite(res)) {
+          safeWrite(res, ": heartbeat\n\n");
+        } else {
+          clearInterval(waiterHeartbeat);
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+      try {
+        const result = await inflight;
+        if (canWrite(res)) {
+          if (result.status === 200) {
+            // SSE-keyed entries store the original's full SSE transcript
+            safeWrite(res, result.body);
+          } else {
+            // Sentinel/error result (JSON body) — wrap as an SSE error event
+            safeWrite(res, `data: ${result.body.toString()}\n\n`);
+            safeWrite(res, "data: [DONE]\n\n");
+          }
+        }
+        res.end();
+      } finally {
+        clearInterval(waiterHeartbeat);
+      }
+      return;
+    }
     const result = await inflight;
     res.writeHead(result.status, result.headers);
     res.end(result.body);
@@ -4460,13 +4593,31 @@ async function proxyRequest(
       // Check balance before proceeding (using buffered amount)
       // Wrap in try/catch: Solana RPC failures (timeouts, rate limits) should
       // not silently downgrade the request — pass through optimistically instead.
+      // Time-bound the check: it runs before SSE headers are flushed, and a slow
+      // RPC (Solana retries can stack to ~34s) would starve streaming clients of
+      // their first byte until past OpenClaw's ~10-15s silence timeout. On
+      // timeout we proceed optimistically; the in-flight RPC still resolves in
+      // the background and warms the monitor's cache for the next request.
       let sufficiency: Awaited<ReturnType<typeof balanceMonitor.checkSufficient>> | null = null;
+      let balanceCheckTimer: ReturnType<typeof setTimeout> | undefined;
       try {
-        sufficiency = await balanceMonitor.checkSufficient(bufferedCostMicros);
+        sufficiency = await Promise.race([
+          balanceMonitor.checkSufficient(bufferedCostMicros),
+          new Promise<null>((resolve) => {
+            balanceCheckTimer = setTimeout(() => {
+              console.warn(
+                `[ClawRouter] Balance check exceeded ${BALANCE_CHECK_TIMEOUT_MS}ms — proceeding optimistically`,
+              );
+              resolve(null);
+            }, BALANCE_CHECK_TIMEOUT_MS);
+          }),
+        ]);
       } catch (balanceErr) {
         console.warn(
           `[ClawRouter] Balance check failed (${balanceErr instanceof Error ? balanceErr.message : String(balanceErr)}) — proceeding optimistically`,
         );
+      } finally {
+        clearTimeout(balanceCheckTimer);
       }
 
       if (sufficiency && (sufficiency.info.isEmpty || !sufficiency.sufficient)) {
@@ -4480,7 +4631,7 @@ async function proxyRequest(
         isFreeModel = true; // keep in sync — budget logic gates on !isFreeModel
         // Update the body with new model (map free/ → nvidia/ for upstream)
         const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
-        parsed.model = toUpstreamModelId(FREE_MODEL);
+        parsed.model = toUpstreamModelId(freeFallback);
         body = Buffer.from(JSON.stringify(parsed));
 
         // Build fund instruction — include wallet address so user knows where to send
@@ -4906,6 +5057,10 @@ async function proxyRequest(
           res.end(errPayload);
         }
         deduplicator.removeInflight(dedupKey);
+        // This return exits before the shared cleanup below — release the
+        // global timeout + close listener so they don't outlive the request.
+        clearTimeout(timeoutId);
+        req.removeListener("close", onClientClose);
         return;
       }
 
@@ -5183,7 +5338,7 @@ async function proxyRequest(
                 upstream = retryResult.response;
                 actualModelUsed = tryModel;
                 console.log(`[ClawRouter] Rate-limit retry succeeded for: ${tryModel}`);
-                if (options.maxCostPerRunUsd && effectiveSessionId && tryModel !== FREE_MODEL) {
+                if (options.maxCostPerRunUsd && effectiveSessionId && !FREE_MODELS.has(tryModel)) {
                   const costEst = estimateAmount(tryModel, body.length, maxTokens);
                   if (costEst) {
                     sessionStore.addSessionCost(effectiveSessionId, BigInt(costEst));
@@ -5960,7 +6115,7 @@ async function proxyRequest(
       logCost = actualPayment;
       // Calculate baseline for savings comparison
       const chargedInputTokens = Math.ceil(body.length / 4);
-      const modelDef = BLOCKRUN_MODELS.find((m) => m.id === logModel);
+      const modelDef = BLOCKRUN_MODEL_BY_ID.get(logModel);
       const chargedOutputTokens = modelDef ? Math.min(maxTokens, modelDef.maxOutput) : maxTokens;
       const baseline = calculateModelCost(
         logModel,

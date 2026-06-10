@@ -7,11 +7,11 @@
 <p>Agents can't sign up for accounts. Agents can't enter credit cards.<br>
 Agents can only sign transactions.<br><br>
 <strong>ClawRouter is the only LLM router that lets agents operate independently.</strong><br><br>
-<em>9 models free, no crypto required. No signup. No API key. No credit card.</em></p>
+<em>6 models free, no crypto required. No signup. No API key. No credit card.</em></p>
 
 <br>
 
-<img src="https://img.shields.io/badge/🆓_9_Free_Models-success?style=for-the-badge" alt="9 free models">&nbsp;
+<img src="https://img.shields.io/badge/🆓_6_Free_Models-success?style=for-the-badge" alt="6 free models">&nbsp;
 <img src="https://img.shields.io/badge/🤖_Agent--Native-black?style=for-the-badge" alt="Agent native">&nbsp;
 <img src="https://img.shields.io/badge/🔑_Zero_API_Keys-blue?style=for-the-badge" alt="No API keys">&nbsp;
 <img src="https://img.shields.io/badge/⚡_Local_Routing-yellow?style=for-the-badge" alt="Local routing">&nbsp;
@@ -46,7 +46,7 @@ Every other LLM router was built for **human developers** — create an account,
 
 ClawRouter is built for the agent-first world:
 
-- **Starts at $0** — 9 NVIDIA models are free forever (incl. 1M-context DeepSeek V4 Flash + a vision-capable Nemotron Omni)
+- **Starts at $0** — 6 NVIDIA models are free forever (incl. 1M-context DeepSeek V4 Flash + a vision-capable Nemotron Omni)
 - **No accounts** — a wallet is generated locally, no signup
 - **No API keys** — your wallet signature IS authentication
 - **No model selection** — 15-dimension scoring picks the right model automatically
@@ -62,7 +62,7 @@ This is the stack that lets agents operate autonomously: **x402 + USDC + local r
 |                  | OpenRouter        | LiteLLM          | Martian           | Portkey           | **ClawRouter**          |
 | ---------------- | ----------------- | ---------------- | ----------------- | ----------------- | ----------------------- |
 | **Models**       | 200+              | 100+             | Smart routing     | Gateway           | **55+**                 |
-| **Free tier**    | Rate-limited      | BYO keys         | No                | No                | **9 models, no signup** |
+| **Free tier**    | Rate-limited      | BYO keys         | No                | No                | **6 models, no signup** |
 | **Routing**      | Manual selection  | Manual selection | Smart (closed)    | Observability     | **Smart (open source)** |
 | **Auth**         | Account + API key | Your API keys    | Account + API key | Account + API key | **Wallet signature**    |
 | **Payment**      | Credit card       | BYO keys         | Credit card       | $49-499/mo        | **USDC per-request**    |
@@ -78,7 +78,7 @@ This is the stack that lets agents operate autonomously: **x402 + USDC + local r
 
 ## Quick Start
 
-> **No wallet? 10 models work free out of the box.** Install, run, and pin `nvidia/gpt-oss-120b` (or any of the 10) — no crypto, no signup, no balance required. Add USDC later when you want paid models.
+> **No wallet? 6 models work free out of the box.** Install, run, and pin `nvidia/gpt-oss-120b` (or any of the 6) — no crypto, no signup, no balance required. Add USDC later when you want paid models.
 
 ### Option A — OpenClaw Agent
 
@@ -118,7 +118,7 @@ npx @blockrun/clawrouter
 ```
 
 **2. Fund your wallet** — optional, skip for free tier
-Your wallet address is printed on first run. For paid models, send a few USDC on Base or Solana — $5 covers thousands of requests. To stay at $0, pin any of the 9 free models (e.g. `nvidia/gpt-oss-120b`) or use `/model free` inside OpenClaw.
+Your wallet address is printed on first run. For paid models, send a few USDC on Base or Solana — $5 covers thousands of requests. To stay at $0, pin any of the 6 free models (e.g. `nvidia/gpt-oss-120b`) or use `/model free` inside OpenClaw.
 
 **3. Point your client at `http://localhost:8402`**
 
@@ -207,12 +207,12 @@ Choose your routing strategy with `/model <profile>`:
 Request → Weighted Scorer (15 dimensions) → Tier → Best Model → Response
 ```
 
-| Tier      | ECO Model                           | AUTO Model                            | PREMIUM Model                |
-| --------- | ----------------------------------- | ------------------------------------- | ---------------------------- |
-| SIMPLE    | nvidia/gpt-oss-120b (**FREE**)      | gemini-2.5-flash ($0.30/$2.50)        | kimi-k2.6 ($0.95/$4.00)      |
-| MEDIUM    | gemini-3.1-flash-lite ($0.25/$1.50) | kimi-k2.5 ($0.60/$3.00)               | gpt-5.3-codex ($1.75/$14.00) |
-| COMPLEX   | gemini-3.1-flash-lite ($0.25/$1.50) | gemini-3.1-pro ($2/$12)               | claude-opus-4.8 ($5/$25)     |
-| REASONING | grok-4-1-fast ($0.20/$0.50)         | grok-4-1-fast-reasoning ($0.20/$0.50) | claude-sonnet-4.6 ($3/$15)   |
+| Tier      | ECO Model                             | AUTO Model                            | PREMIUM Model                |
+| --------- | ------------------------------------- | ------------------------------------- | ---------------------------- |
+| SIMPLE    | nvidia/gpt-oss-120b (**FREE**)        | gemini-2.5-flash ($0.30/$2.50)        | kimi-k2.6 ($0.95/$4.00)      |
+| MEDIUM    | gemini-3.1-flash-lite ($0.25/$1.50)   | kimi-k2.6 ($0.95/$4.00)               | gpt-5.3-codex ($1.75/$14.00) |
+| COMPLEX   | gemini-3.1-flash-lite ($0.25/$1.50)   | gemini-3.1-pro ($2/$12)               | claude-opus-4.8 ($5/$25)     |
+| REASONING | grok-4-1-fast-reasoning ($0.20/$0.50) | grok-4-1-fast-reasoning ($0.20/$0.50) | claude-sonnet-4.6 ($3/$15)   |
 
 **Blended average: $2.05/M** vs $25/M for Claude Opus = **92% savings**
 
@@ -259,14 +259,15 @@ curl -X POST http://localhost:8402/v1/videos/generations \
   -d '{"model":"bytedance/seedance-2.0-fast","prompt":"a red apple slowly spinning","duration_seconds":5}'
 ```
 
-| Model                         | Provider           | 5s text-to-video | 5s image-to-video | Duration              |
-| ----------------------------- | ------------------ | ---------------- | ----------------- | --------------------- |
-| `bytedance/seedance-1.5-pro`  | ByteDance Seedance | ~$0.46           | ~$0.46 (flat)     | 5s default, up to 10s |
-| `bytedance/seedance-2.0-fast` | ByteDance Seedance | ~$1.19           | ~$0.70            | 5s default, up to 10s |
-| `bytedance/seedance-2.0`      | ByteDance Seedance | ~$1.49           | ~$0.91            | 5s default, up to 10s |
-| `xai/grok-imagine-video`      | xAI Grok Imagine   | ~$0.42 (8s)      | n/a               | 8s default            |
+| Model                         | Provider            | 5s text-to-video | 5s image-to-video | Duration              |
+| ----------------------------- | ------------------- | ---------------- | ----------------- | --------------------- |
+| `bytedance/seedance-1.5-pro`  | ByteDance Seedance  | ~$0.46           | ~$0.46 (flat)     | 5s default, up to 10s |
+| `bytedance/seedance-2.0-fast` | ByteDance Seedance  | ~$1.19           | ~$1.19 (flat)     | 5s default, up to 10s |
+| `bytedance/seedance-2.0`      | ByteDance Seedance  | ~$1.49           | ~$1.49 (flat)     | 5s default, up to 10s |
+| `azure/sora-2`                | OpenAI Sora (Azure) | ~$0.42 (4s)      | ~$0.42 (4s, flat) | 4s default; 4/8/12s   |
+| `xai/grok-imagine-video`      | xAI Grok Imagine    | ~$0.42 (8s)      | n/a               | 8s default            |
 
-Seedance is **token-priced upstream** at ~20,256 tokens/sec — the blockrun videos route now defaults Seedance to `resolution=720p` with `generate_audio=true` for text-to-video (2× the per-second token count of the older 480p baseline; audio is included in that rate). The quote is `duration × tokens/sec × $/1M tokens × 1.05 margin`. Image-to-video on 2.0 variants uses a discounted per-token rate (~40% cheaper) when `image_url` is supplied; 1.5 Pro is flat because token360 prices its text and image inputs at the same per-M rate. Calls block for 30–120s while the upstream polls the job. Seedance 2.0 Fast typically returns in 60–80s; 2.0 Pro trades latency for quality.
+Seedance is **token-priced upstream** at ~20,256 tokens/sec — the blockrun videos route now defaults Seedance to `resolution=720p` with `generate_audio=true` for text-to-video (2× the per-second token count of the older 480p baseline; audio is included in that rate). The quote is `duration × tokens/sec × $/1M tokens × 1.05 margin`. Image-to-video is priced the same as text-to-video (the earlier ~40% i2v discount was removed upstream on 2026-06-01; only video-to-video remains cheaper). Sora 2 is flat-priced at $0.10/sec for both t2v and i2v — note it rejects human faces in reference images (use Seedance + RealFace for real people). Calls block for 30–120s while the upstream polls the job. Seedance 2.0 Fast typically returns in 60–80s; 2.0 Pro trades latency for quality.
 
 ### BytePlus RealFace (Seedance 2.0 only)
 
@@ -391,7 +392,6 @@ No Surf account, no API key — settles directly to Surf's Base treasury in USDC
 | --------------------------------------------- | --------: | ---------: | ---------: | ------- | -------------------------------------------- |
 | nvidia/gpt-oss-120b                           |  **FREE** |   **FREE** |     **$0** | 128K    | default free model                           |
 | nvidia/gpt-oss-20b                            |  **FREE** |   **FREE** |     **$0** | 128K    | smaller, faster                              |
-| nvidia/mistral-small-4-119b                   |  **FREE** |   **FREE** |     **$0** | 131K    | ⚠ upstream timing out (2026-06-07)           |
 | nvidia/deepseek-v4-flash                      |  **FREE** |   **FREE** |     **$0** | 1M      | reasoning, ~5x faster than v4-pro            |
 | nvidia/qwen3-coder-480b                       |  **FREE** |   **FREE** |     **$0** | 131K    | coding                                       |
 | nvidia/llama-4-maverick                       |  **FREE** |   **FREE** |     **$0** | 131K    | reasoning                                    |
@@ -424,26 +424,26 @@ No Surf account, no API key — settles directly to Surf's Base treasury in USDC
 
 ### Mid-Range Models ($0.001–$0.01/request)
 
-| Model                       | Input $/M | Output $/M | ~$/request | Context | Features                          |
-| --------------------------- | --------: | ---------: | ---------: | ------- | --------------------------------- |
-| anthropic/claude-haiku-4.5  |     $1.00 |      $5.00 |    $0.0030 | 200K    | vision, agentic, tools            |
-| openai/o1-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                  |
-| openai/o3-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                  |
-| openai/o4-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                  |
-| google/gemini-2.5-pro       |     $1.25 |     $10.00 |    $0.0056 | 1M      | reasoning, vision, tools          |
+| Model                       | Input $/M | Output $/M | ~$/request | Context | Features                                  |
+| --------------------------- | --------: | ---------: | ---------: | ------- | ----------------------------------------- |
+| anthropic/claude-haiku-4.5  |     $1.00 |      $5.00 |    $0.0030 | 200K    | vision, agentic, tools                    |
+| openai/o1-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                          |
+| openai/o3-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                          |
+| openai/o4-mini              |     $1.10 |      $4.40 |    $0.0028 | 128K    | reasoning, tools                          |
+| google/gemini-2.5-pro       |     $1.25 |     $10.00 |    $0.0056 | 1M      | reasoning, vision, tools                  |
 | zai/glm-5.1                 |     $1.40 |      $4.40 |    $0.0029 | 200K    | reasoning, tools (promo ended 2026-06-05) |
-| xai/grok-4.3                |     $1.50 |      $4.00 |    $0.0028 | 1M      | reasoning, vision, agentic, tools |
-| xai/grok-build-0.1          |     $1.50 |      $3.00 |    $0.0023 | 256K    | agentic coding, tools             |
-| openai/gpt-5.2              |     $1.75 |     $14.00 |    $0.0079 | 400K    | reasoning, vision, agentic, tools |
-| openai/gpt-5.3              |     $1.75 |     $14.00 |    $0.0079 | 128K    | reasoning, vision, agentic, tools |
-| openai/gpt-5.3-codex        |     $1.75 |     $14.00 |    $0.0079 | 400K    | agentic, tools                    |
-| openai/gpt-4.1              |     $2.00 |      $8.00 |    $0.0050 | 128K    | vision, tools                     |
-| openai/o3                   |     $2.00 |      $8.00 |    $0.0050 | 200K    | reasoning, tools                  |
-| google/gemini-3-pro-preview |     $2.00 |     $12.00 |    $0.0070 | 1M      | reasoning, vision, tools          |
-| google/gemini-3.1-pro       |     $2.00 |     $12.00 |    $0.0070 | 1M      | reasoning, vision, tools          |
-| xai/grok-2-vision           |     $2.00 |     $10.00 |    $0.0060 | 131K    | vision, tools                     |
-| openai/gpt-4o               |     $2.50 |     $10.00 |    $0.0063 | 128K    | vision, agentic, tools            |
-| openai/gpt-5.4              |     $2.50 |     $15.00 |    $0.0088 | 400K    | reasoning, vision, agentic, tools |
+| xai/grok-4.3                |     $1.50 |      $4.00 |    $0.0028 | 1M      | reasoning, vision, agentic, tools         |
+| xai/grok-build-0.1          |     $1.50 |      $3.00 |    $0.0023 | 256K    | agentic coding, tools                     |
+| openai/gpt-5.2              |     $1.75 |     $14.00 |    $0.0079 | 400K    | reasoning, vision, agentic, tools         |
+| openai/gpt-5.3              |     $1.75 |     $14.00 |    $0.0079 | 128K    | reasoning, vision, agentic, tools         |
+| openai/gpt-5.3-codex        |     $1.75 |     $14.00 |    $0.0079 | 400K    | agentic, tools                            |
+| openai/gpt-4.1              |     $2.00 |      $8.00 |    $0.0050 | 128K    | vision, tools                             |
+| openai/o3                   |     $2.00 |      $8.00 |    $0.0050 | 200K    | reasoning, tools                          |
+| google/gemini-3-pro-preview |     $2.00 |     $12.00 |    $0.0070 | 1M      | reasoning, vision, tools                  |
+| google/gemini-3.1-pro       |     $2.00 |     $12.00 |    $0.0070 | 1M      | reasoning, vision, tools                  |
+| xai/grok-2-vision           |     $2.00 |     $10.00 |    $0.0060 | 131K    | vision, tools                             |
+| openai/gpt-4o               |     $2.50 |     $10.00 |    $0.0063 | 128K    | vision, agentic, tools                    |
+| openai/gpt-5.4              |     $2.50 |     $15.00 |    $0.0088 | 400K    | reasoning, vision, agentic, tools         |
 
 ### Premium Models ($0.01+/request)
 
@@ -560,7 +560,7 @@ This collects diagnostics and sends them to Claude Sonnet for AI-powered analysi
 
 System
   ✓ OS: darwin arm64
-  ✓ Node: v20.11.0
+  ✓ Node: v22.14.0
 
 Wallet
   ✓ Address: 0x1234...abcd

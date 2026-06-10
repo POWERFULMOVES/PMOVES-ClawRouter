@@ -122,16 +122,3 @@ export function shortenPaths(messages: NormalizedMessage[]): PathShorteningResul
     charsSaved,
   };
 }
-
-/**
- * Generate the path map header for the codebook.
- */
-export function generatePathMapHeader(pathMap: Record<string, string>): string {
-  if (Object.keys(pathMap).length === 0) return "";
-
-  const entries = Object.entries(pathMap)
-    .map(([code, path]) => `${code}=${path}`)
-    .join(", ");
-
-  return `[Paths: ${entries}]`;
-}

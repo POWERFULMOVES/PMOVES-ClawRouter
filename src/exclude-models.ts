@@ -5,12 +5,16 @@
  * should never select. Stored as a sorted JSON array on disk.
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { resolveModelAlias } from "./models.js";
 
 const DEFAULT_FILE_PATH = join(homedir(), ".openclaw", "blockrun", "exclude-models.json");
+
+/** mtime-validated cache — loadExcludeList runs on the proxy's hot request
+ *  path, so skip the read+parse when the file hasn't changed. */
+const loadCache = new Map<string, { mtimeMs: number; set: Set<string> }>();
 
 /**
  * Load the exclude list from disk.
@@ -18,13 +22,21 @@ const DEFAULT_FILE_PATH = join(homedir(), ".openclaw", "blockrun", "exclude-mode
  */
 export function loadExcludeList(filePath: string = DEFAULT_FILE_PATH): Set<string> {
   try {
+    const mtimeMs = statSync(filePath).mtimeMs;
+    const cached = loadCache.get(filePath);
+    if (cached && cached.mtimeMs === mtimeMs) {
+      // Copy: callers may mutate the returned set
+      return new Set(cached.set);
+    }
     const raw = readFileSync(filePath, "utf-8");
     const arr: unknown = JSON.parse(raw);
-    if (Array.isArray(arr)) {
-      return new Set(arr.filter((x): x is string => typeof x === "string"));
-    }
-    return new Set();
+    const set = Array.isArray(arr)
+      ? new Set(arr.filter((x): x is string => typeof x === "string"))
+      : new Set<string>();
+    loadCache.set(filePath, { mtimeMs, set });
+    return new Set(set);
   } catch {
+    loadCache.delete(filePath);
     return new Set();
   }
 }
@@ -37,6 +49,8 @@ function saveExcludeList(set: Set<string>, filePath: string): void {
   const dir = dirname(filePath);
   mkdirSync(dir, { recursive: true });
   writeFileSync(filePath, JSON.stringify(sorted, null, 2) + "\n", "utf-8");
+  // Same-millisecond write+read could alias on mtime — drop the entry instead
+  loadCache.delete(filePath);
 }
 
 /**

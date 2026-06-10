@@ -22,7 +22,7 @@ export interface WhitespaceResult {
  * - Normalize tabs to spaces
  * - Trim start/end
  */
-export function normalizeWhitespace(content: string): string {
+function normalizeWhitespace(content: string): string {
   // Defensive type check - content might be array/object for multimodal messages
   if (!content || typeof content !== "string") return content as string;
 

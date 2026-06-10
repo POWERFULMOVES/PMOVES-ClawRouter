@@ -89,7 +89,7 @@ export function createBlockrunMcpServerDefinition(opts?: {
   };
 }
 
-export function isManagedBlockrunMcpServerDefinition(value: unknown): value is McpServerDefinition {
+function isManagedBlockrunMcpServerDefinition(value: unknown): value is McpServerDefinition {
   if (!isRecord(value)) return false;
   const args = isStringArray(value.args) ? value.args : [];
   if (typeof value.command === "string" && value.command === "npx") {

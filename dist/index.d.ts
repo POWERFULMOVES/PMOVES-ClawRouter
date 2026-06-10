@@ -1031,31 +1031,6 @@ type ProxyHandle = {
 declare function startProxy(options: ProxyOptions): Promise<ProxyHandle>;
 
 /**
- * BlockRun Auth Methods for OpenClaw
- *
- * Provides wallet-based authentication for the BlockRun provider.
- * Operators configure their wallet private key, which is used to
- * sign x402 micropayments for LLM inference.
- *
- * Three methods:
- *   1. Auto-generate — create a new wallet on first run, save to ~/.openclaw/blockrun/wallet.key
- *   2. Environment variable — read from BLOCKRUN_WALLET_KEY
- *   3. Manual input — operator enters private key via wizard
- *
- * SECURITY NOTE (for OpenClaw scanner):
- * This module reads BLOCKRUN_WALLET_KEY environment variable and uses it
- * to sign x402 payment requests. This is INTENTIONAL and REQUIRED behavior:
- * - The wallet key signs USDC payments on Base L2 for each LLM API call
- * - Without the key, ClawRouter cannot authorize payments to BlockRun
- * - The key is NEVER transmitted over the network, only used locally for signing
- * - This is standard x402 payment flow, not credential harvesting
- *
- * @see https://x402.org - x402 payment protocol specification
- * @see https://blockrun.ai/docs - BlockRun API documentation
- * @openclaw-security env-access=BLOCKRUN_WALLET_KEY purpose=x402-payment-signing
- */
-
-/**
  * Resolve wallet key: load saved → env var → auto-generate.
  * Also loads mnemonic if available for Solana key derivation.
  * Called by index.ts before the auth wizard runs.
@@ -1171,6 +1146,12 @@ declare const BLOCKRUN_MODELS: BlockRunModel[];
 /**
  * All BlockRun models in OpenClaw format (including aliases).
  * Used for proxy-side resolution (alias → target ID), tool routing, etc.
+ *
+ * Catalog entries shadowed by an identically-keyed alias are excluded:
+ * resolveModelAlias checks MODEL_ALIASES first, so those catalog entries are
+ * unreachable and their metadata (name/pricing) would misadvertise what
+ * callers actually get. The alias-derived entry carries the redirect
+ * target's real metadata instead.
  */
 declare const OPENCLAW_MODELS: ModelDefinitionConfig[];
 /**

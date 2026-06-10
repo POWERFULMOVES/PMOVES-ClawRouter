@@ -63,6 +63,7 @@ export function createPayFetchWithPreAuth(
     // Skip for Solana: payments use per-tx blockhashes that expire ~60-90s,
     // making cached requirements useless and causing double charges.
     const cached = !options?.skipPreAuth ? cache.get(cacheKey) : undefined;
+    let rejected402: Response | undefined;
     if (cached && Date.now() - cached.cachedAt < ttlMs) {
       try {
         const payload = await client.createPaymentPayload(cached.paymentRequired);
@@ -75,17 +76,20 @@ export function createPayFetchWithPreAuth(
         if (response.status !== 402) {
           return response; // Pre-auth worked — saved ~200ms
         }
-        // Pre-auth rejected (params may have changed) — invalidate and fall through
+        // Pre-auth rejected (params may have changed) — invalidate and reuse
+        // this 402 below: it already carries the fresh payment requirements,
+        // so re-requesting without payment would just buy the same 402 again.
         cache.delete(cacheKey);
+        rejected402 = response;
       } catch {
         // Pre-auth signing failed — invalidate and fall through
         cache.delete(cacheKey);
       }
     }
 
-    // Normal flow: make request, handle 402 if needed
+    // Normal flow: make request (or reuse the rejected pre-auth 402), handle 402 if needed
     const clonedRequest = request.clone();
-    const response = await baseFetch(request);
+    const response = rejected402 ?? (await baseFetch(request));
     if (response.status !== 402) {
       return response;
     }
